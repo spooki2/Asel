@@ -1,0 +1,6 @@
+{"sender": "server", "message": "This is the beginning of ben's chat with koolkid"}
+{"sender": "koolkid", "message": "gang!"}
+{"sender": "ben", "message": "yo"}
+{"sender": "ben", "message": "hi"}
+{"sender": "ben", "message": "hi"}
+{"sender": "ben", "message": "hi"}

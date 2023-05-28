@@ -1,0 +1,9 @@
+{"sender": "server", "message": "This is the beginning of 0's chat with koolkid"}
+{"sender": "0", "message": "wassup szrp"}
+{"sender": "0", "message": "hi"}
+{"sender": "0", "message": "nnooo?"}
+{"sender": "0", "message": "nnooo?"}
+{"sender": "0", "message": "ur nuber kill"}
+{"sender": "koolkid", "message": "gi"}
+{"sender": "koolkid", "message": "gi"}
+{"sender": "koolkid", "message": "gi"}
