@@ -16,7 +16,7 @@ with open('DataBase\\UserDataBase.txt') as database:
 #regID is the ID of each users register line, it cannot be changed unlike names.
 #the function above makes regID the last line available
 ip = 'localhost'
-port = 9019
+port = 3000
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
 server.bind((ip,port))
@@ -133,10 +133,17 @@ def callManager(callerName,targetName): #this function manages calls between use
     #send target call popup request
     targetSocket.send(json.dumps({'request':'callPopup','caller':callerName}).encode())
     callChoiceEvent.wait() #waits for accept or decline
-    if callChoiceEvent.choice: #if call accepted
+    if callChoiceEvent.choice: #let both know if call accepted or declined
+        data = {'request':'wasCallAccepted','bool':True}
         print("[CALL ACCEPTED] routing call..")
     else:
-        print("[CALL DECLINED]") #works up to this point
+        data = {'request':'wasCallAccepted','bool':False}
+        print("[CALL DECLINED]")
+    data = json.dumps(data)
+    targetSocket.send(data.encode())
+    callerSocket.send(data.encode())
+    print("data: ", data)
+    
     #logic:
     #if a user is calling, send the target a popup where they can hang up or accept
     #if they accept, send both the request to init call GUI and start data transfer on UDP
@@ -200,7 +207,6 @@ def handleClient(clientSocket, clientAddress):
                     print("[CALL POPUP CHOICE] ",userInfo['acceptedCall'])
                     if userInfo['acceptedCall'] == True:
                         callChoiceEvent.choice = True
-                    print("command sent to not wait")
                     callChoiceEvent.set()
                     
                     
@@ -228,4 +234,5 @@ while True:
     #while true is frozen, waiting for connection
     thread = threading.Thread(target=handleClient, args=(clientSocket, clientAddress))
     thread.start()
+    
 

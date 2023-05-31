@@ -5,24 +5,23 @@ from GUIcode import CallAlertGUI
 from PyQt5.QtCore import QThread, pyqtSignal
 
 
-class AselMainGUI(QtWidgets.QMainWindow):
+class AselMainGUIclass(QtWidgets.QMainWindow):
 
     def __init__(self, *args, **kwargs):
-        super(AselMainGUI, self).__init__(*args, **kwargs)
+        super(AselMainGUIclass, self).__init__(*args, **kwargs)
         self.timer = QTimer() # initialize QTimer
-        
 
-    def callAlertInit(self,callPopupChoice):
+    def callAlertInit(self,callPopupChoice,callerName):
         self.window = QtWidgets.QMainWindow()
         self.ui = CallAlertGUI.classCallAlertGUI()
-        self.ui.setupUi(self.window,callPopupChoice)
+        self.ui.setupUi(self.window,callPopupChoice,callerName)
         self.window.show()
 
 
 
 
         
-    def setupUi(self, Asel,userLookup,sendMessage,refreshLite,callRequest,checkIfCalled):
+    def setupUi(self, Asel,userLookup,sendMessage,refreshLite,callRequest,checkIfCalled,callerName,initCallGUI):
         global loadedText
         loadedText = None
 
@@ -36,6 +35,8 @@ class AselMainGUI(QtWidgets.QMainWindow):
         self.stackedWidget.setGeometry(QtCore.QRect(0, 0, 561, 440))
         self.stackedWidget.setStyleSheet("")
         self.stackedWidget.setObjectName("stackedWidget")
+
+
         self.chatFrame = QtWidgets.QWidget()
         self.chatFrame.setObjectName("chatFrame")
         self.sendMsgButton = QtWidgets.QPushButton(self.chatFrame)
@@ -177,9 +178,9 @@ class AselMainGUI(QtWidgets.QMainWindow):
         
         
         
-        self.stackedWidget.setCurrentIndex(0)
 
-        
+        global globalStackedWidget
+        globalStackedWidget = self.stackedWidget
         global globalTextBox
         globalTextBox = self.textBox
         global globalFriendBoxes
@@ -187,6 +188,9 @@ class AselMainGUI(QtWidgets.QMainWindow):
         def userLookupCall(str):
             userLookup(str)
         
+
+
+
         self.friendBox1.clicked.connect(lambda: userLookupCall(self.friendBox1.text()))
         self.friendBox2.clicked.connect(lambda: userLookupCall(self.friendBox2.text()))
         self.friendBox3.clicked.connect(lambda: userLookupCall(self.friendBox3.text()))
@@ -211,8 +215,10 @@ class AselMainGUI(QtWidgets.QMainWindow):
         self.userLine.returnPressed.connect(userLookupStorage)
         self.sendMsgButton.clicked.connect(messageStorage)
 
+
         self.timer.timeout.connect(checkIfCalled)
         self.timer.timeout.connect(refreshLite)
+        self.timer.timeout.connect(initCallGUI)
         self.timer.start(10)
 
 

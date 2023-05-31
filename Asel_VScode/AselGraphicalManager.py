@@ -15,10 +15,9 @@ from AselClass import lastTalkedStack
 import traceback
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
-#TODO array of objects, [1].setpos(0) [2].setpos(50) [3].setpos(100)
-#TODO then array ints are sorted 
 #setup paths
-
+callerName = "<NAME>"
+initCallGUI = False
 activeChatData = ""
 callPopUp = False
 activeChatUser = None
@@ -38,8 +37,11 @@ recentChats = lastTalkedStack(8) #a custom class stack of all recent chats with 
 
 def ListenThread(): #unhanled exceptions may lead to aplication crashes
     global recentChats
-    while True:
-        finished = pyqtSignal()
+    while True:            
+        global callPopUp
+        global callerName
+        global activeChatUser
+        global initCallGUI
         #print(f'[PACKET GOT]: {recv.decode()}')
         #packet =""
         packet = json.loads(recvAll(client).decode())
@@ -56,8 +58,8 @@ def ListenThread(): #unhanled exceptions may lead to aplication crashes
         except:
             None
         try:
+
             if packet['request'] == "userLookup":
-                global activeChatUser
                 if packet['username'] == None:
                     activeChatUser = None
                 else:   
@@ -71,14 +73,23 @@ def ListenThread(): #unhanled exceptions may lead to aplication crashes
                     activeChatData = formatChatData(json.dumps(packet))
                 else:
                     print("[NOTIFICATION]")
-            
             elif packet['request'] == "callPopup":
-                global callPopUp
+                callerName = packet['caller']
                 callPopUp = True
-                #todo send server if client said yes or no to call
+
+            elif packet['request'] == "wasCallAccepted":
+                if packet['bool']:
+                    print("[CALL ACCEPTED]")
+                    initCallGUI  = True
+                    
+
+                else:
+                    print("[CALL DECLINED]")
+
+        
         except:
             #traceback.print_exc()
-            None
+            None    
 
 
 
@@ -135,7 +146,7 @@ try:
     ip = 'localhost'
     global port
     global client
-    port = 9019
+    port = 3000
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect((ip, port))
     client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
@@ -145,6 +156,7 @@ except:
     client.close()
 try:
     LT = threading.Thread(target=ListenThread).start()  
+    
 except:
     print(traceback.print_exc())
     print("thread initiation failed")
@@ -179,7 +191,7 @@ def logChoice(): #user chose login on intro
     loginPath = True
     IntroGUI.introGlobal.close()
 def okRegister():
-    global skipToLogin
+    global skipToLogin0
     global skipToRegister
     skipToRegister = False
     skipToLogin = True
@@ -211,7 +223,6 @@ def execGUI(objectGUI,*callbacks): #function that procedurally runs a GUI module
     Asel = objectGUI.QtWidgets.QMainWindow()
     classGUI().setupUi(Asel,*callbacks)
     if objectGUI == AselMainGUI:  # This is the AselMainGUI, create an instance and keep a reference
-        print("mat")
         AselMainGUI.instance = Asel  # This stores the instance so it won't be garbage collected
         global classGUI_ins
         classGUI_ins = classGUI
@@ -223,6 +234,10 @@ def sendDM(message):
     if message == "" or message == None:
         data = {"request":"dm","target":activeChatUser,"message":"blankMsg"} #* testing
     client.send(json.dumps(data).encode()) #dict -> json[str]
+
+
+#todo:  sqllite, encyrpted "diffie hellman",
+#todo strechlist:  block 2 many requests, check both sides for illegal characters
 
 def userLookup(customInput=None):
     if not customInput:
@@ -259,8 +274,32 @@ def sendCallRequest():
 def checkIfCalled():
     global callPopUp
     if callPopUp:
-        AselMainGUI.AselMainGUI.callAlertInit(AselMainGUI.AselMainGUI,callPopupChoice)
+        AselMainGUI.AselMainGUIclass.callAlertInit(AselMainGUI.AselMainGUIclass,callPopupChoice,callerName)
         callPopUp = False
+
+
+initRunOnce = False
+def initCallFunc():
+    global initRunOnce
+    if initCallGUI:
+        AselMainGUI.globalStackedWidget.setCurrentIndex(1)
+        if initRunOnce == False:
+            threading.Thread(target=callThreadFunc).start()
+            initRunOnce = True
+
+
+
+        
+def callThreadFunc():
+    try:
+        VCport = port+1
+        VCsocket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # UDP SOCKET
+        VCsocket.connect((ip, VCport))
+        VCsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
+        print(f"connected on port {VCport}")
+    except:
+        print("VC connection failed")
+        VCsocket.close()
 
 
 
@@ -285,13 +324,16 @@ def pathController():
         print("loginValid: ",loginValid)
         if loginValid == True:
             execGUI(AlertGUI,okLogin,"login Successful","","Open Asel")
-            execGUI(AselMainGUI,userLookup,sendDM,refreshLite,sendCallRequest,checkIfCalled)
+            execGUI(AselMainGUI,userLookup,sendDM,refreshLite,sendCallRequest,checkIfCalled,callerName,initCallFunc)
         else:
             execGUI(AlertGUI,tryAgainLogin,"Login Invalid","please check your credentials","Try Again")
             if skipToLogin:
                 pathController()
 
 
-#skipToLogin = True #* temporary
+skipToLogin = True #* temporary
 pathController() #it should be impossible for any REQ to get sent before register/login
+
+
+
 

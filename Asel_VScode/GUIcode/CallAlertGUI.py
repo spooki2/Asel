@@ -6,7 +6,7 @@ class classCallAlertGUI(object):
     def __init__(self):
         super().__init__()
 
-    def setupUi(self, callAlert,callPopupChoice):
+    def setupUi(self, callAlert,callPopupChoice,callerName):
         callAlert.setObjectName("callAlert")
         callAlert.resize(150, 140)
         callAlert.setStyleSheet("background-color: rgb(35,35,35);\n"
@@ -68,8 +68,7 @@ class classCallAlertGUI(object):
         QtCore.QMetaObject.connectSlotsByName(callAlert)
 
         callAlert.setWindowTitle("callAlert")
-        self.callerName.setText("<html><head/><body><p align=\"center\">&lt;NAME&gt;</p><p align=\"center\"><span style=\" font-size:9pt;\">incoming call...</span></p></body></html>")
-        
+        self.callerName.setText(f"<html><head/><body><p align=\"center\">{callerName}</p><p align=\"center\"><span style=\" font-size:9pt;\">incoming call...</span></p></body></html>")
         self.acceptCallButton.clicked.connect(lambda: callPopupChoice(True,callAlert))
         self.declineCallButton.clicked.connect(lambda: callPopupChoice(False,callAlert))
                 
