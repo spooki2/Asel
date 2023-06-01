@@ -15,6 +15,11 @@ from AselClass import lastTalkedStack
 import traceback
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
+import cv2
+import base64
+import numpy as np
+  
+# define a video capture object
 #setup paths
 callerName = "<NAME>"
 initCallGUI = False
@@ -35,7 +40,7 @@ recentChats = lastTalkedStack(8) #a custom class stack of all recent chats with 
 
 
 
-def ListenThread(): #unhanled exceptions may lead to aplication crashes
+def listenThreadTCP(): #unhanled exceptions may lead to aplication crashes
     global recentChats
     while True:            
         global callPopUp
@@ -44,7 +49,7 @@ def ListenThread(): #unhanled exceptions may lead to aplication crashes
         global initCallGUI
         #print(f'[PACKET GOT]: {recv.decode()}')
         #packet =""
-        packet = json.loads(recvAll(client).decode())
+        packet = json.loads(recvAll(TCPclient).decode())
         try:
             if packet['registerValid'] == True:
                 global registerValid
@@ -91,11 +96,15 @@ def ListenThread(): #unhanled exceptions may lead to aplication crashes
             #traceback.print_exc()
             None    
 
-
-
+def listenThreadUDP():
+    data, address = UDPclient.recvfrom(1024)
+    while True:
+        print("GOT PACKET: ",data)
+        pass
+    
 def callPopupChoice(Choice,popupObject):
     data = {"request":"callPopupChoice","acceptedCall":Choice}
-    client.send(json.dumps(data).encode()) #dict -> json[str]
+    TCPclient.send(json.dumps(data).encode()) #dict -> json[str]
     popupObject.close()
 
 def recvAll(connection):
@@ -146,16 +155,25 @@ try:
     ip = 'localhost'
     global port
     global client
-    port = 3000
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect((ip, port))
-    client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
+    port = 3080
+    TCPclient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    TCPclient.connect((ip, port))
+    TCPclient.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
     print(f"connected on port {port}")
+
+    # UDP client socket
+    UDPclient = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    UDPclient.connect((ip, port))
+    UDPclient.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # makes port available after closing
+    print(f"UDP socket ready on port {port}")
+
 except:
     print("server connection failed")
-    client.close()
+    TCPclient.close()
+    UDPclient.close()
 try:
-    LT = threading.Thread(target=ListenThread).start()  
+    threading.Thread(target=listenThreadTCP).start()  
+    threading.Thread(target=listenThreadUDP).start()  
     
 except:
     print(traceback.print_exc())
@@ -168,7 +186,7 @@ def regSubmit():
     username = RegisterGUI.username
     passwordHash = hashlib.sha256(RegisterGUI.password.encode()).hexdigest()
     data = {"request":"register","username":username,"password":passwordHash}
-    client.send((json.dumps(data)).encode()) #dict -> json[str]
+    TCPclient.send((json.dumps(data)).encode()) #dict -> json[str]
     RegisterGUI.registerGlobal.close()
 
     
@@ -176,9 +194,7 @@ def logSubmit():
     username = LoginGUI.username
     passwordHash = hashlib.sha256(LoginGUI.password.encode()).hexdigest()
     data = {"request":"login","username":username,"password":passwordHash}
-    #passwordHash = hashlib.sha256("123".encode()).hexdigest()
-    #data = {"request":"login","username":"ben","password":passwordHash} #* these 2 lines are TEMP | is FOR TESTING
-    client.send(json.dumps(data).encode()) #dict -> json[str]
+    TCPclient.send(json.dumps(data).encode()) #dict -> json[str]
     LoginGUI.loginGlobal.close()
 
 
@@ -233,7 +249,7 @@ def sendDM(message):
     data = {"request":"dm","target":activeChatUser,"message":message}
     if message == "" or message == None:
         data = {"request":"dm","target":activeChatUser,"message":"blankMsg"} #* testing
-    client.send(json.dumps(data).encode()) #dict -> json[str]
+    TCPclient.send(json.dumps(data).encode()) #dict -> json[str]
 
 
 #todo:  sqllite, encyrpted "diffie hellman",
@@ -246,7 +262,7 @@ def userLookup(customInput=None):
     else:
         userSearch=customInput
         data = {"request":"userLookup","username":userSearch}
-        client.send((json.dumps(data)).encode()) #dict -> json[str]
+        TCPclient.send((json.dumps(data)).encode()) #dict -> json[str]
         
 def refreshLite(): #callback function that refreshes the chat with current active data
     _ = 0
@@ -264,12 +280,12 @@ def refreshLite(): #callback function that refreshes the chat with current activ
 
 def refreshChat():
     data = {"request":"loadChat","target":activeChatUser}
-    client.send((json.dumps(data)).encode()) #dict -> json[str]
+    TCPclient.send((json.dumps(data)).encode()) #dict -> json[str]
 
 
 def sendCallRequest():
     data = {"request":"call","targetName":activeChatUser}
-    client.send((json.dumps(data)).encode()) #dict -> json[str]
+    TCPclient.send((json.dumps(data)).encode()) #dict -> json[str]
 
 def checkIfCalled():
     global callPopUp
@@ -284,25 +300,46 @@ def initCallFunc():
     if initCallGUI:
         AselMainGUI.globalStackedWidget.setCurrentIndex(1)
         if initRunOnce == False:
-            threading.Thread(target=callThreadFunc).start()
-            initRunOnce = True
+            threading.Thread(target=callThreadFunc).start()  
+            initRunOnce = True #TODO find where this needs to be reset for post hangup calls
+
+
+def imageEncode(frameImage,compVal): # Convert the image to a base64 string
+    camValidVal, buffer = cv2.imencode('.jpg', frameImage, [int(cv2.IMWRITE_JPEG_QUALITY), compVal])
+    base64_image_str = str(base64.b64encode(buffer))
+    return base64_image_str
+
+def imageDecode(bytesImage): # Convert the base64 string back to an image
+    img_bytes = base64.b64decode(bytesImage)
+    img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
+    decoded_img = cv2.imdecode(img_arr, flags=cv2.IMREAD_COLOR)
+    return decoded_img
+
+
+            
+
+    
+
+#vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+#camValid, frame = vid.read()
+#imgBytes = imageEncode(frame)
 
 
 
-        
 def callThreadFunc():
-    try:
-        VCport = port+1
-        VCsocket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # UDP SOCKET
-        VCsocket.connect((ip, VCport))
-        VCsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
-        print(f"connected on port {VCport}")
-    except:
-        print("VC connection failed")
-        VCsocket.close()
+    # Start video capture
+    vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    while True:
+        camValid, frame = vid.read()
+        if camValid:
+            imgBytes = imageEncode(frame,70)
+            UDPclient.send(imgBytes.encode())
+            
+        
+    
 
-
-
+#UDPclient.send()
+0
 #due to how pyqt5 works pythons garbage collector will automatically close windows that do not refer to themselves, thats why you can NOT-
 #call PathController from a different function, a workaround to this is using "paths", which are booleans which will determine the flow
 #of the menu's

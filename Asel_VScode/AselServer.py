@@ -16,12 +16,19 @@ with open('DataBase\\UserDataBase.txt') as database:
 #regID is the ID of each users register line, it cannot be changed unlike names.
 #the function above makes regID the last line available
 ip = 'localhost'
-port = 3000
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
-server.bind((ip,port))
-server.listen()
+port = 3080
+TCPserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+TCPserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
+TCPserver.bind((ip,port))
+TCPserver.listen()
+
+
+UDPserver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+UDPserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
+UDPserver.bind((ip, port))
+
 print(f"[SERVER ONLINE] [PORT {port}]")
+
 
 
 
@@ -142,27 +149,30 @@ def callManager(callerName,targetName): #this function manages calls between use
     data = json.dumps(data)
     targetSocket.send(data.encode())
     callerSocket.send(data.encode())
-    print("data: ", data)
     
     #logic:
     #if a user is calling, send the target a popup where they can hang up or accept
     #if they accept, send both the request to init call GUI and start data transfer on UDP
     
+def UDPhandleClient(data, UDPaddress):
+    packet = data.decode()
+    print(packet)
 
-
-
+    #data = ("afta afta party".encode())
+    #UDPserver.sendto(data, UDPaddress)
+    # Add your data handling code here.
 
 socketNames = {} #declartion, dict maps usernames to sockets {username:socket}
-def handleClient(clientSocket, clientAddress):
+def TCPhandleClient(clientSocket, clientAddress):
     ConnectionDead = False
     global activeConnections
     global socketNames
     activeConnections+=1
-    print(f"[CONNECTION STARTED {clientAddress}] [{activeConnections} Total]")
+    print(f"[TCP CONNECTION STARTED {clientAddress}] [{activeConnections} Total]")
     while not ConnectionDead: #runs as long as user connected
-        recv = clientSocket.recv(1024)
-        packet = recv.decode()
         try:
+            recv = clientSocket.recv(1024)
+            packet = recv.decode()
             if isValidJson(packet): #json format validation
                 userInfo = json.loads(packet)
                 #userInfo is DICT
@@ -217,9 +227,9 @@ def handleClient(clientSocket, clientAddress):
         except Exception as e:
             ConnectionDead = True
             activeConnections-=1
-            traceback.print_exc() #prints the exception
+            #traceback.print_exc() #prints the exception
             print("")
-            print(f"[CONNECTION TERMINATED {clientAddress}] [{activeConnections} Total]")
+            print(f"[TCP CONNECTION TERMINATED {clientAddress}] [{activeConnections} Total]")
 
 
 def getSocketByName(name):
@@ -228,11 +238,17 @@ def getSocketByName(name):
         return socket
 
 
+def UDPthread():
+    while True:
+        data, address = UDPserver.recvfrom(90000)
+        threading.Thread(target=UDPhandleClient, args=(data, address)).start()
 
+threading.Thread(target=UDPthread).start()
+
+        
 while True:
-    clientSocket, clientAddress = server.accept()
+    TCPclientSocket, TCPclientAddress = TCPserver.accept()
     #while true is frozen, waiting for connection
-    thread = threading.Thread(target=handleClient, args=(clientSocket, clientAddress))
-    thread.start()
+    threading.Thread(target=TCPhandleClient, args=(TCPclientSocket, TCPclientAddress)).start()  
     
 
