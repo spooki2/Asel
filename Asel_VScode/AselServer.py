@@ -15,8 +15,8 @@ with open('DataBase\\UserDataBase.txt') as database:
         regID+=1
 #regID is the ID of each users register line, it cannot be changed unlike names.
 #the function above makes regID the last line available
-ip = 'localhost'
-port = 3080
+ip = '0.0.0.0'
+port = 4000
 TCPserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 TCPserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
 TCPserver.bind((ip,port))
@@ -152,7 +152,7 @@ def callManager(callerName,targetName): #this function manages calls between use
     callerSocket.send(data.encode())
     
 
-def callThread(callerName,targetName): #! for next time make it so it sends indiv webcam data
+def callThread(callerName,targetName):
     while True: #TODO KILL OFF AFTER CALL
 
         UDPcallerAddress = UDPnameToAddr[callerName]
@@ -255,8 +255,10 @@ def TCPhandleClient(clientSocket, clientAddress):
                     jsonUF = json.dumps(userInfo)
                     jsonUF = jsonUF.replace('"request": "relay", ','')
                     jsonUF = jsonUF.replace('Relay','')
-                    
-                    clientSocket.send(jsonUF.encode())
+                    targetName = userInfo['target']
+                    jsonUF = jsonUF.replace(f'"target": "{targetName}", ','')
+                    print("jsonUF: ",jsonUF)
+                    getSocketByName(targetName).send(jsonUF.encode())
                     
                 
             else: 

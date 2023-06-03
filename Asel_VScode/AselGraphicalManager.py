@@ -23,10 +23,11 @@ import random
 import string
 # define a video capture object
 #setup paths
+activeCallUsername = ""
 cameraToggle = True
 cameraToggleSelf = True
 camResolution = {'height':0,'width':0}
-callerName = "<NAME>"
+callUsername = "<NAME>"
 initCallGUI = False
 activeChatData = ""
 callPopUp = False
@@ -50,7 +51,7 @@ def listenThreadTCP(): #unhanled exceptions may lead to aplication crashes
     global recentChats
     while True:            
         global callPopUp
-        global callerName
+        global callUsername
         global activeChatUser
         global initCallGUI
         #print(f'[PACKET GOT]: {recv.decode()}')
@@ -85,7 +86,7 @@ def listenThreadTCP(): #unhanled exceptions may lead to aplication crashes
                 else:
                     print("[NOTIFICATION]")
             elif packet['request'] == "callPopup":
-                callerName = packet['caller']
+                callUsername = packet['caller']
                 callPopUp = True
 
             elif packet['request'] == "wasCallAccepted":
@@ -179,10 +180,10 @@ def formatChatData(jsonStr):
 
 
 try:
-    ip = 'localhost'
+    ip = '10.0.0.23'
     global port
     global client
-    port = 3080
+    port = 4000
     TCPclient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     TCPclient.connect((ip, port))
     TCPclient.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #makes port available after closing
@@ -236,7 +237,7 @@ def logChoice(): #user chose login on intro
     loginPath = True
     IntroGUI.introGlobal.close()
 def okRegister():
-    global skipToLogin0
+    global skipToLogin
     global skipToRegister
     skipToRegister = False
     skipToLogin = True
@@ -313,13 +314,15 @@ def refreshChat():
 
 
 def sendCallRequest():
+    global callUsername
+    callUsername = activeChatUser
     data = {"request":"call","targetName":activeChatUser,"UDPport":UDPclient.getsockname()[1]}
     TCPclient.send((json.dumps(data)).encode()) #dict -> json[str]
 
 def checkIfCalled():
     global callPopUp
     if callPopUp:
-        AselMainGUI.AselMainGUIclass.callAlertInit(AselMainGUI.AselMainGUIclass,callPopupChoice,callerName)
+        AselMainGUI.AselMainGUIclass.callAlertInit(AselMainGUI.AselMainGUIclass,callPopupChoice,callUsername)
         callPopUp = False
 
 
@@ -358,8 +361,17 @@ def imageDecode(bytesImage): # Convert the base64 string back to an image
 def callThreadFunc():
     # Start video capture
     #UDPclient.send(f"im [{myUsername}]".encode())
-    
-    vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    camWorks = False
+    i=0
+    while not camWorks:
+        try:
+            vid = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+            camWorks = True
+        except:
+            if i > 3:
+                i = 0
+            i+=1
+
     toggleLogic = False
     while True:
         if cameraToggleSelf:
@@ -370,11 +382,11 @@ def callThreadFunc():
             else:
                 print("[CAM NOT VALID]")
         if cameraToggleSelf and toggleLogic:
-            TCPclient.send(json.dumps({"request":"relay","requestRelay":"cameraToggle","bool":True}).encode())
+            TCPclient.send(json.dumps({"request":"relay","requestRelay":"cameraToggle","target":callUsername,"bool":True}).encode())
             toggleLogic = False
             print("sending True")   
         if not cameraToggleSelf and not toggleLogic:        
-            TCPclient.send(json.dumps({"request":"relay","requestRelay":"cameraToggle","bool":False}).encode())
+            TCPclient.send(json.dumps({"request":"relay","requestRelay":"cameraToggle","target":callUsername,"bool":False}).encode())
             print("sending False")
             toggleLogic = True
         
@@ -398,7 +410,7 @@ def updateCamFeed(cameraToggleButton):
             pass
     else:
         AselMainGUI.globalWebCam.setGeometry(QtCore.QRect(100, 10, 341, 341))
-        AselMainGUI.globalWebCam.setPixmap(QtGui.QPixmap("GUIcode/icons/cameraOff.png"))
+        AselMainGUI.globalWebCam.setPixmap(QtGui.QPixmap(r"GUIcode\icons\cameraOff.png"))
 
 def pathController():
     if not skipToLogin and not skipToRegister:
@@ -418,7 +430,7 @@ def pathController():
         print("loginValid: ",loginValid)
         if loginValid == True:
             execGUI(AlertGUI,okLogin,"login Successful","","Open Asel")
-            execGUI(AselMainGUI,userLookup,sendDM,refreshLite,sendCallRequest,checkIfCalled,callerName,initCallFunc,updateCamFeed)
+            execGUI(AselMainGUI,userLookup,sendDM,refreshLite,sendCallRequest,checkIfCalled,callUsername,initCallFunc,updateCamFeed)
         else:
             execGUI(AlertGUI,tryAgainLogin,"Login Invalid","please check your credentials","Try Again")
             if skipToLogin:
