@@ -1,3 +1,0 @@
-{"sender": "server", "message": "This is the beginning of ben's chat with ben"}
-{"sender": "ben", "message": "hi"}
-{"sender": "ben", "message": "hi"}
