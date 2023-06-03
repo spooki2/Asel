@@ -14,13 +14,18 @@ import json
 from AselClass import lastTalkedStack
 import traceback
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import QThread, pyqtSignal
 import cv2
 import base64
 import numpy as np
-  
+import random
+import string
 # define a video capture object
 #setup paths
+cameraToggle = True
+cameraToggleSelf = True
+camResolution = {'height':0,'width':0}
 callerName = "<NAME>"
 initCallGUI = False
 activeChatData = ""
@@ -28,6 +33,7 @@ callPopUp = False
 activeChatUser = None
 activeChatUser = "ben" #* testing
 recv = ""
+pyqtPixmap = None
 skipToLogin = False
 skipToRegister = False
 registerPath = False
@@ -86,24 +92,45 @@ def listenThreadTCP(): #unhanled exceptions may lead to aplication crashes
                 if packet['bool']:
                     print("[CALL ACCEPTED]")
                     initCallGUI  = True
-                    
-
                 else:
                     print("[CALL DECLINED]")
-
+            elif packet['request'] == "cameraToggle":
+                global cameraToggle
+                if packet['bool'] == True:
+                    cameraToggle = True
+                if packet['bool'] == False:
+                    cameraToggle = False
+                print(f"other user camtoggle: {cameraToggle}")
         
         except:
             #traceback.print_exc()
             None    
 
+
 def listenThreadUDP():
-    data, address = UDPclient.recvfrom(1024)
+    global pyqtPixmap
+    global camResolution
     while True:
-        print("GOT PACKET: ",data)
-        pass
+        data, address = UDPclient.recvfrom(90000)
+        
+        data = data.decode()
+        decodedImg = imageDecode(data)
+        #decodedImg = cv2.resize(decodedImg, (341*2, 341))
+        #scaled_image = cv2.warpAffine(decodedImg, cv2.getRotationMatrix2D((decodedImg.shape[1]/2, decodedImg.shape[0]/2), 0, 0.5), (decodedImg.shape[1], decodedImg.shape[0]))
+        #decodedImg = cv2.warpAffine(scaled_image, np.float32([[1, 0, -150], [0, 1, 0]]), (scaled_image.shape[1], scaled_image.shape[0]))
+        
+        height, width, channel = decodedImg.shape
+        camResolution['height'] = height
+        camResolution['width'] = width
+        bytesPerLine = 3 * width
     
+        # Convert the color space from BGR to RGB
+        decodedImg = cv2.cvtColor(decodedImg, cv2.COLOR_BGR2RGB)
+        pyqtImage = QImage(decodedImg.data, width, height, bytesPerLine, QImage.Format_RGB888)
+        
+        pyqtPixmap = QPixmap.fromImage(pyqtImage) #converts to pyqt5 image
 def callPopupChoice(Choice,popupObject):
-    data = {"request":"callPopupChoice","acceptedCall":Choice}
+    data = {"request":"callPopupChoice","acceptedCall":Choice,"UDPport":UDPclient.getsockname()[1]}
     TCPclient.send(json.dumps(data).encode()) #dict -> json[str]
     popupObject.close()
 
@@ -179,17 +206,19 @@ except:
     print(traceback.print_exc())
     print("thread initiation failed")
 
-
+myUsername = "blank"
 def regSubmit():
     global registerSubmitPath
+    global myUsername
     registerSubmitPath = True
     username = RegisterGUI.username
+    myUsername = username
     passwordHash = hashlib.sha256(RegisterGUI.password.encode()).hexdigest()
     data = {"request":"register","username":username,"password":passwordHash}
     TCPclient.send((json.dumps(data)).encode()) #dict -> json[str]
     RegisterGUI.registerGlobal.close()
 
-    
+
 def logSubmit():
     username = LoginGUI.username
     passwordHash = hashlib.sha256(LoginGUI.password.encode()).hexdigest()
@@ -284,7 +313,7 @@ def refreshChat():
 
 
 def sendCallRequest():
-    data = {"request":"call","targetName":activeChatUser}
+    data = {"request":"call","targetName":activeChatUser,"UDPport":UDPclient.getsockname()[1]}
     TCPclient.send((json.dumps(data)).encode()) #dict -> json[str]
 
 def checkIfCalled():
@@ -306,8 +335,8 @@ def initCallFunc():
 
 def imageEncode(frameImage,compVal): # Convert the image to a base64 string
     camValidVal, buffer = cv2.imencode('.jpg', frameImage, [int(cv2.IMWRITE_JPEG_QUALITY), compVal])
-    base64_image_str = str(base64.b64encode(buffer))
-    return base64_image_str
+    imgBytes = base64.b64encode(buffer)
+    return imgBytes
 
 def imageDecode(bytesImage): # Convert the base64 string back to an image
     img_bytes = base64.b64decode(bytesImage)
@@ -328,21 +357,49 @@ def imageDecode(bytesImage): # Convert the base64 string back to an image
 
 def callThreadFunc():
     # Start video capture
+    #UDPclient.send(f"im [{myUsername}]".encode())
+    
     vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    toggleLogic = False
     while True:
-        camValid, frame = vid.read()
-        if camValid:
-            imgBytes = imageEncode(frame,70)
-            UDPclient.send(imgBytes.encode())
-            
+        if cameraToggleSelf:
+            camValid, frame = vid.read()
+            if camValid:
+                imgBytes = imageEncode(frame,70)
+                UDPclient.send(imgBytes)
+            else:
+                print("[CAM NOT VALID]")
+        if cameraToggleSelf and toggleLogic:
+            TCPclient.send(json.dumps({"request":"relay","requestRelay":"cameraToggle","bool":True}).encode())
+            toggleLogic = False
+            print("sending True")   
+        if not cameraToggleSelf and not toggleLogic:        
+            TCPclient.send(json.dumps({"request":"relay","requestRelay":"cameraToggle","bool":False}).encode())
+            print("sending False")
+            toggleLogic = True
         
     
 
 #UDPclient.send()
-0
 #due to how pyqt5 works pythons garbage collector will automatically close windows that do not refer to themselves, thats why you can NOT-
 #call PathController from a different function, a workaround to this is using "paths", which are booleans which will determine the flow
 #of the menu's
+
+
+def updateCamFeed(cameraToggleButton):
+    global cameraToggleSelf
+    cameraToggleSelf = cameraToggleButton
+    if cameraToggle:
+        try:
+            AselMainGUI.globalWebCam.setGeometry(QtCore.QRect(0, 0, camResolution["width"], camResolution["height"]))
+            AselMainGUI.globalWebCam.setPixmap(pyqtPixmap)
+        except:
+            
+            pass
+    else:
+        AselMainGUI.globalWebCam.setGeometry(QtCore.QRect(100, 10, 341, 341))
+        AselMainGUI.globalWebCam.setPixmap(QtGui.QPixmap("GUIcode/icons/cameraOff.png"))
+
 def pathController():
     if not skipToLogin and not skipToRegister:
         execGUI(IntroGUI,regChoice,logChoice) #Intro initiation
@@ -361,7 +418,7 @@ def pathController():
         print("loginValid: ",loginValid)
         if loginValid == True:
             execGUI(AlertGUI,okLogin,"login Successful","","Open Asel")
-            execGUI(AselMainGUI,userLookup,sendDM,refreshLite,sendCallRequest,checkIfCalled,callerName,initCallFunc)
+            execGUI(AselMainGUI,userLookup,sendDM,refreshLite,sendCallRequest,checkIfCalled,callerName,initCallFunc,updateCamFeed)
         else:
             execGUI(AlertGUI,tryAgainLogin,"Login Invalid","please check your credentials","Try Again")
             if skipToLogin:

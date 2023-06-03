@@ -136,13 +136,14 @@ def callManager(callerName,targetName): #this function manages calls between use
 
     targetSocket = getSocketByName(targetName)
     callerSocket = getSocketByName(callerName)
-    
     #send target call popup request
     targetSocket.send(json.dumps({'request':'callPopup','caller':callerName}).encode())
     callChoiceEvent.wait() #waits for accept or decline
     if callChoiceEvent.choice: #let both know if call accepted or declined
         data = {'request':'wasCallAccepted','bool':True}
         print("[CALL ACCEPTED] routing call..")
+        threading.Thread(target=callThread,args=(callerName,targetName)).start()
+        
     else:
         data = {'request':'wasCallAccepted','bool':False}
         print("[CALL DECLINED]")
@@ -150,23 +151,52 @@ def callManager(callerName,targetName): #this function manages calls between use
     targetSocket.send(data.encode())
     callerSocket.send(data.encode())
     
+
+def callThread(callerName,targetName): #! for next time make it so it sends indiv webcam data
+    while True: #TODO KILL OFF AFTER CALL
+
+        UDPcallerAddress = UDPnameToAddr[callerName]
+        UDPtargetAddress = UDPnameToAddr[targetName]
+
+        
+        try:
+            UDPserver.sendto(UDPaddrToData[UDPcallerAddress],UDPtargetAddress)
+            #print("UDPaddrToData PROBLem: ",UDPaddrToData[UDPcallerAddress])
+        except:
+            #print("exep1")
+            #traceback.print_exc()
+            #quit()
+            pass
+        try:
+            UDPserver.sendto(UDPaddrToData[UDPtargetAddress],UDPcallerAddress)
+            #print(UDPtargetAddress)
+        except:
+            #print("exep2")
+            pass
+
+
+
     #logic:
     #if a user is calling, send the target a popup where they can hang up or accept
     #if they accept, send both the request to init call GUI and start data transfer on UDP
-    
-def UDPhandleClient(data, UDPaddress):
-    packet = data.decode()
-    print(packet)
+UDPaddrToData = {} #tracks data corelated with addresss
+UDPnameToAddr = {} #tracks the ip and the udp port of each name
+#def UDPhandleClient(data, UDPaddress): 
 
-    #data = ("afta afta party".encode())
+    #UDPaddrToData[UDPaddress] = data
+    #UDPportToName[UDPaddress] = data
     #UDPserver.sendto(data, UDPaddress)
-    # Add your data handling code here.
+    
+    #TODO make it so that data gets cross sent between users
 
 socketNames = {} #declartion, dict maps usernames to sockets {username:socket}
+addressNames = {}
 def TCPhandleClient(clientSocket, clientAddress):
     ConnectionDead = False
     global activeConnections
     global socketNames
+    global UDPnameToAddr
+    global addressNames
     activeConnections+=1
     print(f"[TCP CONNECTION STARTED {clientAddress}] [{activeConnections} Total]")
     while not ConnectionDead: #runs as long as user connected
@@ -194,6 +224,7 @@ def TCPhandleClient(clientSocket, clientAddress):
                     if databaseCheck(userInfo):
                         clientSocket.send(json.dumps({"loginValid": True}).encode()) 
                         socketNames[userInfo['username']] = clientSocket
+                        addressNames[userInfo['username']] = clientAddress
                         clientName = userInfo['username']
                     else:
                         clientSocket.send(json.dumps({"loginValid": False}).encode()) 
@@ -208,22 +239,30 @@ def TCPhandleClient(clientSocket, clientAddress):
                     dmServerManager(clientName,userInfo["target"],"",True)
 
                 elif userInfo['request'] == "call":
+                    UDPnameToAddr[clientName] = (clientAddress[0],userInfo['UDPport'])
                     callThread = threading.Thread(target=callManager, args=(clientName, userInfo['targetName']))
                     callThread.start()
-                    #! what is lambda?
                 
                 elif userInfo['request'] == "callPopupChoice":
                     global callChoiceEvent
                     print("[CALL POPUP CHOICE] ",userInfo['acceptedCall'])
+                    UDPnameToAddr[clientName] = (clientAddress[0],userInfo['UDPport'])
                     if userInfo['acceptedCall'] == True:
                         callChoiceEvent.choice = True
                     callChoiceEvent.set()
+
+                elif userInfo['request'] == "relay":
+                    jsonUF = json.dumps(userInfo)
+                    jsonUF = jsonUF.replace('"request": "relay", ','')
+                    jsonUF = jsonUF.replace('Relay','')
                     
+                    clientSocket.send(jsonUF.encode())
                     
-            else:
+                
+            else: 
                 print(f"[GOT INVALID PACKET]: {packet}")
                 raise Exception("[JSON RECEIVED IS NOT VALID]")
-        
+
         except Exception as e:
             ConnectionDead = True
             activeConnections-=1
@@ -231,21 +270,25 @@ def TCPhandleClient(clientSocket, clientAddress):
             print("")
             print(f"[TCP CONNECTION TERMINATED {clientAddress}] [{activeConnections} Total]")
 
-
 def getSocketByName(name):
     if name in socketNames:
         socket = socketNames[name]
         return socket
 
 
+
 def UDPthread():
     while True:
         data, address = UDPserver.recvfrom(90000)
-        threading.Thread(target=UDPhandleClient, args=(data, address)).start()
+        UDPaddrToData[address] = data
+        #print(f"UDPaddrSent: {UDPnameToAddr}")
+        #print(f"UDPaddrLogd: {UDPaddrToData}")
+        #threading.Thread(target=UDPhandleClient, args=(data, address)).start()
+        #print("active: ",threading.active_count())
 
 threading.Thread(target=UDPthread).start()
 
-        
+
 while True:
     TCPclientSocket, TCPclientAddress = TCPserver.accept()
     #while true is frozen, waiting for connection

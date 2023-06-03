@@ -21,10 +21,11 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
 
 
         
-    def setupUi(self, Asel,userLookup,sendMessage,refreshLite,callRequest,checkIfCalled,callerName,initCallGUI):
+    def setupUi(self, Asel,userLookup,sendMessage,refreshLite,callRequest,checkIfCalled,callerName,initCallGUI,updateCamFeed):
         global loadedText
         loadedText = None
-
+        global camToggle
+        camToggle = True
         Asel.setObjectName("Asel")
         Asel.setEnabled(True)
         Asel.resize(560, 440)
@@ -117,6 +118,11 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.camFrame.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.camFrame.setFrameShadow(QtWidgets.QFrame.Raised)
         self.camFrame.setObjectName("camFrame")
+        self.webCam = QtWidgets.QLabel(self.camFrame)
+        self.webCam.setGeometry(QtCore.QRect(100, 10, 341, 341))
+        self.webCam.setText("")
+        self.webCam.setPixmap(QtGui.QPixmap("GUIcode/icons/cameraOff.png"))
+        self.webCam.setObjectName("Webcam")
         self.hangUpCallButton = QtWidgets.QPushButton(self.mainPage)
         self.hangUpCallButton.setGeometry(QtCore.QRect(450, 380, 101, 51))
         self.hangUpCallButton.setToolTip("")
@@ -177,8 +183,8 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.userLine.setPlaceholderText(" Search a user...")
         
         
-        
-
+        global globalWebCam
+        globalWebCam = self.webCam
         global globalStackedWidget
         globalStackedWidget = self.stackedWidget
         global globalTextBox
@@ -215,7 +221,19 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.userLine.returnPressed.connect(userLookupStorage)
         self.sendMsgButton.clicked.connect(messageStorage)
 
+        
+        def toggleLogic():
+            global camToggle
+            if camToggle:
+                camToggle = False
+            else:
+                camToggle = True
+            
 
+
+        self.cameraButton.clicked.connect(toggleLogic)
+
+        self.timer.timeout.connect(lambda: updateCamFeed(camToggle))
         self.timer.timeout.connect(checkIfCalled)
         self.timer.timeout.connect(refreshLite)
         self.timer.timeout.connect(initCallGUI)

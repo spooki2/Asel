@@ -13,3 +13,5 @@
 {"sender": "ben", "message": "testing"}
 {"sender": "ben", "message": "hi"}
 {"sender": "0", "message": "test"}
+{"sender": "ben", "message": "j"}
+{"sender": "0", "message": "j"}

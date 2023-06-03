@@ -7,12 +7,16 @@ import cv2
 import base64
 import numpy as np
 
-for _ in "sup":
-    print("j")
+dict = {}
+i=0
+while True:
+    print(dict)
+    dict[str(i)] = "j"
+    i+=1
+    if i > 10:
+        quit()
 
 
-
-'''
 
 
 def imageEncode(frameImage): # Convert the image to a base64 string
@@ -25,7 +29,7 @@ def imageDecode(bytesImage): # Convert the base64 string back to an image
     img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
     decoded_img = cv2.imdecode(img_arr, flags=cv2.IMREAD_COLOR)
     return decoded_img
-    
+''' 
 # Start video capture
 vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
@@ -46,3 +50,7 @@ while True:
 
 
 '''
+ 
+# show image
+#cv2.imshow('Decoded', decoded_img)
+#cv2.waitKey(0)
