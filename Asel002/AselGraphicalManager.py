@@ -21,13 +21,14 @@ from GUIcode import AselMainGUI
 from GUIcode import IntroGUI
 from GUIcode import LoginGUI
 from GUIcode import RegisterGUI
-
+from PyQt5.QtWidgets import QApplication
 # define a video capture object
 # setup paths
 chunks = 2048
 killCameraEvent = threading.Event()
 killCameraEvent.choice = False
 vid = None
+otherUserUnmuted = False
 pyAudioIns = None
 serverMicAddr = None
 serverCamAddr = None
@@ -37,6 +38,7 @@ threadCall = None
 activeCallUsername = ""
 cameraToggle = True
 cameraToggleSelf = True
+muteToggleSelf = False
 camResolution = {'height': 0, 'width': 0}
 callUsername = "<NAME>"
 initCallGUI = False
@@ -120,6 +122,13 @@ def listenThreadTCP():
                 initCallGUI = False
                 killCameraEvent.choice = True
 
+            elif packet['request'] == "micToggle":
+                global otherUserUnmuted
+                if packet['bool']:
+                    otherUserUnmuted = True
+                else:
+                    otherUserUnmuted = False
+
 
 
 
@@ -139,7 +148,10 @@ def micListenThread():
             data, serverMicAddr = UDPclientMic.recvfrom(90000)
             while True:
                 data, serverMicAddr = UDPclientMic.recvfrom(90000)
-                outputStream.write(data)
+                if otherUserUnmuted:
+                    outputStream.write(data)
+                else:
+                    data = None
         except:
             pass
 
@@ -302,7 +314,7 @@ def tryAgainLogin():
 def execGUI(objectGUI, *callbacks):  # function that procedurally runs a GUI module and links its paramaters
     classGUI = inspect.getmembers(objectGUI, lambda member: inspect.isclass(member))
     classGUI = classGUI[0][1]
-    app = objectGUI.QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     Asel = objectGUI.QtWidgets.QMainWindow()
     classGUI().setupUi(Asel, *callbacks)
     Asel.show()
@@ -376,7 +388,7 @@ def checkIfCallEnded():
 
         if runCallEndOnce:
             # callEnded = False
-            print("kill camera")
+            print("[Closing Camera]")
             #
             try:
                 vid.release()
@@ -390,7 +402,10 @@ def checkIfCallEnded():
                 pass
             runCallEndOnce = False
             runCallStartOnce = False
-
+            global muteToggleSelf
+            muteToggleSelf = False
+            global  cameraToggle
+            cameraToggle = True
 
 runCallStartOnce = False
 
@@ -429,13 +444,12 @@ def callThreadFunc():
     vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     pyAudioIns = pyaudio.PyAudio()
     channels = 1
-    rate = 48000
+    rate = 24000 #rate behaves weirdly, some pcs need to have it as 24k. while others as full 48k
     Format = pyaudio.paInt16
     default_device_index = pyAudioIns.get_default_input_device_info()["index"]
     deviceInfo = pyAudioIns.get_device_info_by_index(default_device_index)
     channels = deviceInfo["maxInputChannels"]
-    rate = int(deviceInfo["defaultSampleRate"])
-
+    #rate = int(deviceInfo["defaultSampleRate"])
 
 
     inputStream = pyAudioIns.open(format=Format, channels=channels, rate=rate, input=True, frames_per_buffer=chunks)
@@ -447,9 +461,18 @@ def callThreadFunc():
 
     camWorks = True
     toggleLogic = False
+    unmuteSendOnce = True
     while initCallGUI:
         try:
-            UDPclientMic.send(inputStream.read(chunks * 2))
+            if not muteToggleSelf:
+                if unmuteSendOnce:
+                    TCPclient.send(json.dumps({"request": "relay", "requestRelay": "micToggle", "target": callUsername,
+                                               "bool": True}).encode())
+                    unmuteSendOnce = False
+                UDPclientMic.send(inputStream.read(chunks * 2))
+            else:
+                TCPclient.send(json.dumps({"request": "relay", "requestRelay": "micToggle", "target": callUsername, "bool": False}).encode())
+                unmuteSendOnce = True
             # print("len: ",len(inputStream.read(chunks)))
             # print("sent mic data!")
             if cameraToggleSelf:
@@ -491,7 +514,9 @@ def updateCamFeed(cameraToggleButton):
     except:
         pass
 
-
+def checkIfMuted(muteButton):
+    global muteToggleSelf
+    muteToggleSelf = muteButton
 def killCall():
     data = {"request": "killCall"}
     TCPclient.send(json.dumps(data).encode())
@@ -516,7 +541,7 @@ def pathController():
         if loginValid == True:
             execGUI(AlertGUI, okLogin, "login Successful", "", "Open Asel")
             execGUI(AselMainGUI, userLookup, sendDM, refreshLite, sendCallRequest, checkIfCalled, callUsername,
-                    initCallFunc, updateCamFeed, killCall, checkIfCallEnded)
+                    initCallFunc, updateCamFeed, killCall, checkIfCallEnded,checkIfMuted)
         else:
             execGUI(AlertGUI, tryAgainLogin, "Login Invalid", "please check your credentials", "Try Again")
             if skipToLogin:

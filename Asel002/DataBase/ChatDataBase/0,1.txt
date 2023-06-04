@@ -60,3 +60,5 @@
 {"sender": "0", "message": "1111"}
 {"sender": "0", "message": "1111"}
 {"sender": "0", "message": "1111"}
+{"sender": "1", "message": "blankMsg"}
+{"sender": "1", "message": "blankMsg"}

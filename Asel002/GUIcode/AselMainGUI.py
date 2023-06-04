@@ -18,11 +18,13 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.window.show()
 
     def setupUi(self, Asel, userLookup, sendMessage, refreshLite, callRequest, checkIfCalled, callerName, initCallFunc,
-                updateCamFeed, killCall, checkIfCallEnded):
+                updateCamFeed, killCall, checkIfCallEnded,checkIfMuted):
         global loadedText
         loadedText = None
         global camToggle
         camToggle = True
+        global muteToggle
+        muteToggle = False
         Asel.setObjectName("Asel")
         Asel.setEnabled(True)
         Asel.resize(560, 440)
@@ -219,20 +221,27 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.userLine.returnPressed.connect(userLookupStorage)
         self.sendMsgButton.clicked.connect(messageStorage)
 
-        def toggleLogic():
+        def camToggleLogic():
             global camToggle
             if camToggle:
                 camToggle = False
             else:
                 camToggle = True
+        def micToggleLogic():
+            global muteToggle
+            if muteToggle:
+                muteToggle = False
+            else:
+                muteToggle = True
 
 
-
-        self.cameraButton.clicked.connect(toggleLogic)
+        self.cameraButton.clicked.connect(camToggleLogic)
+        self.muteButton.clicked.connect(micToggleLogic)
         self.hangUpCallButton.clicked.connect(killCall)
         self.timer.timeout.connect(checkIfCalled)
         self.timer.timeout.connect(checkIfCallEnded)
         self.timer.timeout.connect(refreshLite)
         self.timer.timeout.connect(initCallFunc)
         self.timer.timeout.connect(lambda: updateCamFeed(camToggle))
+        self.timer.timeout.connect(lambda: checkIfMuted(muteToggle))
         self.timer.start(10)

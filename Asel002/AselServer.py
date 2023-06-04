@@ -319,9 +319,6 @@ def getSocketByName(name):
     if name in socketNames:
         socketFound = socketNames[name]
         return socketFound
-    else:
-        print("[getSocketByName FAILED]")
-        print(F'looked for [{name}] in [{socketNames}]')
 
 
 def UDPcamThread():
