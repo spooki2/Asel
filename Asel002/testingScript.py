@@ -1,47 +1,55 @@
-import cv2
-import base64
-from PIL import Image
-import numpy as np
-import io
-import cv2
-import base64
-import numpy as np
-import json
+import socket
+import threading
+import pyaudio
+
+client = socket.socket()
+
+host = "35.164.39.119"
+port = 5000
+
+client.connect((host, port))
+
+pyAudioIns = pyaudio.PyAudio()
+
+Format = pyaudio.paInt16
+Chunks = 4096
+Channels = 2
+Rate = 44100
+
+inputStream = pyAudioIns.open(format=Format, channels=Channels, rate=Rate, input=True, frames_per_buffer=Chunks)
+
+outputStream = pyAudioIns.open(format=Format, channels=Channels, rate=Rate, output=True, frames_per_buffer=Chunks)
 
 
-
-def imageEncode(frameImage): # Convert the image to a base64 string
-    camValidVal, buffer = cv2.imencode('.jpg', frameImage)
-    base64_image_str = base64.b64encode(buffer)
-    return base64_image_str
-
-def imageDecode(bytesImage): # Convert the base64 string back to an image
-    img_bytes = base64.b64decode(bytesImage)
-    img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
-    decoded_img = cv2.imdecode(img_arr, flags=cv2.IMREAD_COLOR)
-    return decoded_img
-''' 
-# Start video capture
-vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-
-while True:
-    # Capture one frame
-    camValid, frame = vid.read()
-
-    if camValid:
-        imgBytes = imageEncode(frame)
-        decoded_img = imageDecode(imgBytes)
+def send():
+    while True:
+        try:
+            data = inputStream.read(Chunks)
+            client.send(data)
+        except:
+            break
 
 
-        # Display the original and decoded images
-        cv2.imshow('Original', frame)
-        cv2.imshow('Decoded', decoded_img)
-        cv2.waitKey(1)
+def receive():
+    while True:
+        try:
+            data = client.recv(Chunks)
+            outputStream.write(data)
+        except:
+            break
 
 
+t1 = threading.Thread(target=send)
+t2 = threading.Thread(target=receive)
 
-'''
- 
-# show image
-#cv2.imshow('Decoded', decoded_img)
-#cv2.waitKey(0)
+t1.start()
+t2.start()
+
+t1.join()
+t2.join()
+
+inputStream.stop()
+inputStream.close()
+outputStream.stop()
+outputStream.close()
+pyAudioIns.terminate()

@@ -3,6 +3,7 @@ import socket
 import json
 import os
 import traceback
+import time
 
 # setup variables
 
@@ -18,16 +19,27 @@ with open('DataBase\\UserDataBase.txt') as DB:
 # the function above makes regID the last line available
 ip = '0.0.0.0'
 port = 4000
-TCPserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-TCPserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
-TCPserver.bind((ip, port))
-TCPserver.listen()
 
-UDPserver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-UDPserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
-UDPserver.bind((ip, port))
+while True:
+    try:
+        TCPserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        TCPserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
+        TCPserver.bind((ip, port))
+        TCPserver.listen()
 
-print(f"[SERVER ONLINE] [PORT {port}]")
+        UDPserverWebcam = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        UDPserverWebcam.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
+        UDPserverWebcam.bind((ip, (port + 1)))
+
+        UDPserverMic = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        UDPserverMic.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
+        UDPserverMic.bind((ip, (port + 2)))
+        print(f"[SERVER ONLINE] [PORT {port}]")
+        break
+    except WindowsError:
+        print("[Server Setup Failed]")
+        print("retrying...\n")
+        time.sleep(3)
 
 
 def isValidJson(jsonString):  # checks if string is valid json
@@ -170,14 +182,31 @@ def callThread(callerName, targetName):
     while callAlive:
         if killCallEvent.choice:
             callAlive = False
-        UDPcallerAddress = UDPnameToAddr[callerName]
-        UDPtargetAddress = UDPnameToAddr[targetName]
+        callerCamAddr = nameToCamAddr[callerName]
+        targetCamAddr = nameToCamAddr[targetName]
+        callerMicAddr = nameToMicAddr[callerName]
+        targetMicAddr = nameToMicAddr[targetName]
+
+        # print(f"target: {callerMicAddr}")
+        # print(f"list: {addrToMicData}")
+        # print("daj: ",addrToMicData[callerMicAddr])
+        # print("")
         try:
-            UDPserver.sendto(UDPaddrToData[UDPcallerAddress], UDPtargetAddress)
+            UDPserverMic.sendto(addrToMicData[callerMicAddr], targetMicAddr)
+        except:
+            traceback.print_exc()
+            pass
+        try:
+            UDPserverMic.sendto(addrToMicData[targetMicAddr], callerMicAddr)
+        except:
+            traceback.print_exc()
+            pass
+        try:
+            UDPserverWebcam.sendto(addrToWebcamData[callerCamAddr], targetCamAddr)
         except:
             pass
         try:
-            UDPserver.sendto(UDPaddrToData[UDPtargetAddress], UDPcallerAddress)
+            UDPserverWebcam.sendto(addrToWebcamData[targetCamAddr], callerCamAddr)
         except:
             pass
     data = json.dumps({"request": "callEnded"})
@@ -186,8 +215,11 @@ def callThread(callerName, targetName):
     print("[Call Ended]")
 
 
-UDPaddrToData = {}  # tracks data corelated with addresss
-UDPnameToAddr = {}  # tracks the ip and the udp port of each name
+addrToWebcamData = {}
+addrToMicData = {}  # they both track data corelated with addresss
+
+nameToCamAddr = {}
+nameToMicAddr = {}  # they both track the ip and the udp port of each name
 
 socketNames = {}  # declartion, dict maps usernames to sockets {username:socket}
 addressNames = {}
@@ -197,7 +229,8 @@ def TCPhandleClient(clientSocket, clientAddress):
     ConnectionDead = False
     global activeConnections
     global socketNames
-    global UDPnameToAddr
+    global nameToCamAddr
+    global nameToMicAddr
     global addressNames
     activeConnections += 1
     print(f"[TCP CONNECTION STARTED {clientAddress}] [{activeConnections} Total]")
@@ -241,15 +274,15 @@ def TCPhandleClient(clientSocket, clientAddress):
                     dmServerManager(clientName, userInfo["target"], "", True)
 
                 elif userInfo['request'] == "call":
-                    UDPnameToAddr[clientName] = (clientAddress[0], userInfo['UDPport'])
-                    print("starting call thread!")
+                    nameToCamAddr[clientName] = (clientAddress[0], userInfo['UDPcamPort'])
+                    nameToMicAddr[clientName] = (clientAddress[0], userInfo['UDPmicPort'])
                     threading.Thread(target=callManager, args=(clientName, userInfo['targetName'])).start()
-                    print("started call thread!")
 
                 elif userInfo['request'] == "callPopupChoice":
-                    print(userInfo)
                     print("[CALL POPUP CHOICE] ", userInfo['acceptedCall'])
-                    UDPnameToAddr[clientName] = (clientAddress[0], userInfo['UDPport'])
+                    nameToCamAddr[clientName] = (clientAddress[0], userInfo['UDPcamPort'])
+                    nameToMicAddr[clientName] = (clientAddress[0], userInfo['UDPmicPort'])
+
                     if userInfo['acceptedCall']:
                         callChoiceEvent.choice = True
                     callChoiceEvent.set()
@@ -286,17 +319,24 @@ def getSocketByName(name):
         print(F'looked for [{name}] in [{socketNames}]')
 
 
-def UDPthread():
+def UDPcamThread():
     while True:
-        data, address = UDPserver.recvfrom(90000)
-        UDPaddrToData[address] = data
-        # print(f"UDPaddrSent: {UDPnameToAddr}")
-        # print(f"UDPaddrLogd: {UDPaddrToData}")
-        # threading.Thread(target=UDPhandleClient, args=(data, address)).start()
-        # print("active: ",threading.active_count())
+        webcamData, webcamAddr = UDPserverWebcam.recvfrom(90000)
+        addrToWebcamData[webcamAddr] = webcamData
 
 
-threading.Thread(target=UDPthread).start()
+def UDPmicThread():
+    while True:
+        try:
+            micData, micAddr = UDPserverMic.recvfrom(2048*2)  # stuck on
+            addrToMicData[micAddr] = micData
+        except:
+            print("error in thread")
+            traceback.print_exc()
+
+
+threading.Thread(target=UDPcamThread).start()
+threading.Thread(target=UDPmicThread).start()
 
 while True:
     TCPclientSocket, TCPclientAddress = TCPserver.accept()

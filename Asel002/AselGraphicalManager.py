@@ -6,8 +6,11 @@ import socket
 import sys
 import threading
 import time
+import traceback
 
+import sounddevice as sd
 import cv2
+import pyaudio
 import numpy as np
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QImage, QPixmap
@@ -21,10 +24,12 @@ from GUIcode import RegisterGUI
 
 # define a video capture object
 # setup paths
-
+chunks = 1024*2
 killCameraEvent = threading.Event()
 killCameraEvent.choice = False
 vid = None
+inputStream = None
+outputStream = None
 threadCall = None
 activeCallUsername = ""
 cameraToggle = True
@@ -48,7 +53,7 @@ runAselPath = False
 recentChats = lastTalkedStack(8)  # a custom class stack of all recent chats with the max value being set to 8
 
 
-def listenThreadTCP():  # unhanled exceptions may lead to aplication crashes
+def listenThreadTCP():
     global recentChats
     while True:
         global callPopUp
@@ -112,35 +117,62 @@ def listenThreadTCP():  # unhanled exceptions may lead to aplication crashes
                 initCallGUI = False
                 killCameraEvent.choice = True
 
+
+
+
         except:
             # traceback.print_exc()
             pass
 
 
-def listenThreadUDP():
+import wave
+
+
+def micListenThread():
+    filename = 'twoOfUs.wav'
+    wf = wave.open(filename, 'rb')
+    # data = wf.readframes(chunks)
+    data, address = UDPclientMic.recvfrom(20000)
+    oldData = data
+    while True:
+        data, address = UDPclientMic.recvfrom(chunks * 2)
+
+        if data == None:
+            print("NONe")
+            # Open the file
+        outputStream.write(data)
+        oldData = data
+
+
+
+def camListenThread():
     global pyqtPixmap
     global camResolution
     while True:
-        data, address = UDPclient.recvfrom(90000)
-        data = data.decode()
-        decodedImg = imageDecode(data)
-        height, width, channel = decodedImg.shape
-        camResolution['height'] = height
-        camResolution['width'] = width
-        bytesPerLine = 3 * width
+        try:
+            data, address = UDPclientWebcam.recvfrom(90000)
+            data = data.decode()
+            decodedImg = imageDecode(data)
+            height, width, channel = decodedImg.shape
+            camResolution['height'] = height
+            camResolution['width'] = width
+            bytesPerLine = 3 * width
 
-        # Convert the color space from BGR to RGB
-        decodedImg = cv2.cvtColor(decodedImg, cv2.COLOR_BGR2RGB)
-        pyqtImage = QImage(decodedImg.data, width, height, bytesPerLine, QImage.Format_RGB888)
+            # Convert the color space from BGR to RGB
+            decodedImg = cv2.cvtColor(decodedImg, cv2.COLOR_BGR2RGB)
+            pyqtImage = QImage(decodedImg.data, width, height, bytesPerLine, QImage.Format_RGB888)
 
-        pyqtPixmap = QPixmap.fromImage(pyqtImage)  # converts to pyqt5 image
+            pyqtPixmap = QPixmap.fromImage(pyqtImage)  # converts to pyqt5 image
+        except:
+            print("[Bad Frame]")
+            pass
 
 
 def callPopupChoice(Choice, popupObject):
-    data = {"request": "callPopupChoice", "acceptedCall": Choice, "UDPport": UDPclient.getsockname()[1]}
+    data = {"request": "callPopupChoice", "acceptedCall": Choice, "UDPcamPort": UDPclientWebcam.getsockname()[1],
+            "UDPmicPort": UDPclientMic.getsockname()[1]}
     TCPclient.send(json.dumps(data).encode())  # dict -> json[str]
     popupObject.close()
-
 
 
 def formatChatData(jsonStr):
@@ -176,18 +208,21 @@ def formatChatData(jsonStr):
 while True:
     try:
         ip = '10.0.0.23'
-        global client
         port = 4000
         TCPclient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         TCPclient.connect((ip, port))
         TCPclient.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
-        print(f"connected on port {port}")
+        print(f"TCP connected on port {port}")
 
         # UDP client socket
-        UDPclient = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        UDPclient.connect((ip, port))
-        UDPclient.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
-        print(f"UDP socket ready on port {port}")
+        UDPclientWebcam = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        UDPclientWebcam.connect((ip, (port + 1)))
+        UDPclientWebcam.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
+
+        UDPclientMic = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        UDPclientMic.connect((ip, (port + 2)))
+        UDPclientMic.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
+
         break
 
     except WindowsError:
@@ -196,8 +231,8 @@ while True:
         time.sleep(3)
 
 threading.Thread(target=listenThreadTCP).start()
-threading.Thread(target=listenThreadUDP).start()
-
+threading.Thread(target=camListenThread).start()
+threading.Thread(target=micListenThread).start()
 myUsername = "blank"
 
 
@@ -315,7 +350,8 @@ def refreshChat():
 def sendCallRequest():
     global callUsername
     callUsername = activeChatUser
-    data = {"request": "call", "targetName": activeChatUser, "UDPport": UDPclient.getsockname()[1]}
+    data = {"request": "call", "targetName": activeChatUser, "UDPcamPort": UDPclientWebcam.getsockname()[1],
+            "UDPmicPort": UDPclientMic.getsockname()[1]}
     TCPclient.send((json.dumps(data)).encode())  # dict -> json[str]
 
 
@@ -326,8 +362,9 @@ def checkIfCalled():
         callPopUp = False
 
 
+runCallEndOnce = False  # the call cant end before it was even started
 
-runCallEndOnce = False #the call cant end before it was even started
+
 def checkIfCallEnded():
     global runCallStartOnce
     global runCallEndOnce
@@ -340,14 +377,22 @@ def checkIfCallEnded():
             # callEnded = False
             print("kill camera")
             vid.release()
+            # TODO ALL:
+            # inputStream.stop()
+            # inputStream.close()
+            # outputStream.stop()
+            # outputStream.close()
+            # pyAudioIns.terminate()
             runCallStartOnce = False
             runCallEndOnce = False
 
+
 runCallStartOnce = False
+
 
 def initCallFunc():
     global threadCall
-    global  runCallStartOnce
+    global runCallStartOnce
     if initCallGUI:
         if not runCallStartOnce:
             AselMainGUI.globalStackedWidget.setCurrentIndex(1)
@@ -371,18 +416,41 @@ def imageDecode(bytesImage):  # Convert the base64 string back to an image
 
 
 def callThreadFunc():
+    # send microphone
+    # microphone sample rate
+    pyAudioIns = pyaudio.PyAudio()
+    channels = 1
+    rate = 48000
+    Format = pyaudio.paInt16
+
+    default_device_index = pyAudioIns.get_default_input_device_info()["index"]
+    deviceInfo = pyAudioIns.get_device_info_by_index(default_device_index)
+    channels = deviceInfo["maxInputChannels"]
+    rate = int(deviceInfo["defaultSampleRate"])
+
+    global inputStream
+    global outputStream
+
+    inputStream = pyAudioIns.open(format=Format, channels=channels, rate=rate, input=True, frames_per_buffer=chunks)
+    outputStream = pyAudioIns.open(format=Format, channels=channels, rate=rate, output=True, frames_per_buffer=chunks)
+
     # Start video capture
     global vid
+
     vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     camWorks = True
 
     toggleLogic = False
     while initCallGUI:
+        # print("len: ",len(inputStream.read(chunks)))
+        UDPclientMic.send(inputStream.read(chunks))
+        # print("sent mic data!")
+
         if cameraToggleSelf:
             camValid, frame = vid.read()
             if camValid:
                 imgBytes = imageEncode(frame, 70)
-                UDPclient.send(imgBytes)
+                UDPclientWebcam.send(imgBytes)
             else:
                 print("[CAM NOT VALID]")
         if cameraToggleSelf and toggleLogic:
@@ -395,8 +463,6 @@ def callThreadFunc():
                 {"request": "relay", "requestRelay": "cameraToggle", "target": callUsername, "bool": False}).encode())
             print("sending False")
             toggleLogic = True
-
-
 
 
 # due to how pyqt5 works pythons garbage collector will automatically close windows that do not
