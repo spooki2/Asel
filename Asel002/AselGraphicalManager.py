@@ -24,11 +24,13 @@ from GUIcode import RegisterGUI
 
 # define a video capture object
 # setup paths
-chunks = 1024*2
+chunks = 2048
 killCameraEvent = threading.Event()
 killCameraEvent.choice = False
 vid = None
 pyAudioIns = None
+serverMicAddr = None
+serverCamAddr = None
 inputStream = None
 outputStream = None
 threadCall = None
@@ -128,16 +130,15 @@ def listenThreadTCP():
 
 import wave
 
-
 def micListenThread():
     # data = wf.readframes(chunks)
     #silentData = wave.open(r"GUIcode/silentWav.wav", 'rb')
     #data = silentData.readframes(chunks)
     while True:
         try:
-            data, address = UDPclientMic.recvfrom(90000)
+            data, serverMicAddr = UDPclientMic.recvfrom(90000)
             while True:
-                data, address = UDPclientMic.recvfrom(90000)
+                data, serverMicAddr = UDPclientMic.recvfrom(90000)
                 outputStream.write(data)
         except:
             pass
@@ -148,7 +149,7 @@ def camListenThread():
     global camResolution
     while True:
         try:
-            data, address = UDPclientWebcam.recvfrom(90000)
+            data, serverCamAddr = UDPclientCam.recvfrom(90000)
             data = data.decode()
             decodedImg = imageDecode(data)
             height, width, channel = decodedImg.shape
@@ -166,7 +167,7 @@ def camListenThread():
 
 
 def callPopupChoice(Choice, popupObject):
-    data = {"request": "callPopupChoice", "acceptedCall": Choice, "UDPcamPort": UDPclientWebcam.getsockname()[1],
+    data = {"request": "callPopupChoice", "acceptedCall": Choice, "UDPcamPort": UDPclientCam.getsockname()[1],
             "UDPmicPort": UDPclientMic.getsockname()[1]}
     TCPclient.send(json.dumps(data).encode())  # dict -> json[str]
     popupObject.close()
@@ -205,21 +206,24 @@ def formatChatData(jsonStr):
 while True:
     try:
         ip = '10.0.0.23'
-        port = 4002
+        port = 4012
         TCPclient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         TCPclient.connect((ip, port))
         TCPclient.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
         print(f"TCP connected on port {port}")
 
         # UDP client socket
-        UDPclientWebcam = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        UDPclientWebcam.connect((ip, (port + 1)))
-        UDPclientWebcam.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
+        UDPclientCam = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        UDPclientCam.connect((ip, (port + 1)))
+        UDPclientCam.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
 
         UDPclientMic = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         UDPclientMic.connect((ip, (port + 2)))
         UDPclientMic.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
-
+        serverMicAddr = UDPclientMic.getsockname()
+        serverCamAddr = UDPclientCam.getsockname()
+        print(serverMicAddr)
+        print(serverCamAddr)
         break
 
     except WindowsError:
@@ -347,7 +351,7 @@ def refreshChat():
 def sendCallRequest():
     global callUsername
     callUsername = activeChatUser
-    data = {"request": "call", "targetName": activeChatUser, "UDPcamPort": UDPclientWebcam.getsockname()[1],
+    data = {"request": "call", "targetName": activeChatUser, "UDPcamPort": UDPclientCam.getsockname()[1],
             "UDPmicPort": UDPclientMic.getsockname()[1]}
     TCPclient.send((json.dumps(data)).encode())  # dict -> json[str]
 
@@ -373,16 +377,19 @@ def checkIfCallEnded():
         if runCallEndOnce:
             # callEnded = False
             print("kill camera")
-            vid.release()
             #
-            runCallStartOnce = False
-            runCallEndOnce = False
             try:
-                inputStream.close()
+                vid.release()
+                outputStream.stop_stream()
                 outputStream.close()
+                inputStream.stop_stream()
+                inputStream.close()
                 pyAudioIns.terminate()
             except:
+                print("[FAILED CLOSE]")
                 pass
+            runCallEndOnce = False
+            runCallStartOnce = False
 
 
 runCallStartOnce = False
@@ -413,7 +420,6 @@ def imageDecode(bytesImage):  # Convert the base64 string back to an image
     return decoded_img
 
 
-
 def callThreadFunc():
     print("init")
     global inputStream
@@ -435,35 +441,36 @@ def callThreadFunc():
     inputStream = pyAudioIns.open(format=Format, channels=channels, rate=rate, input=True, frames_per_buffer=chunks)
     outputStream = pyAudioIns.open(format=Format, channels=channels, rate=rate, output=True, frames_per_buffer=chunks)
 
-
+    #UDPclientMic.send(inputStream.read(chunks * 2))
 
     #webcam
 
     camWorks = True
     toggleLogic = False
     while initCallGUI:
-        # print("len: ",len(inputStream.read(chunks)))
-        # print("sent mic data!")
-
-        UDPclientMic.send(inputStream.read(chunks*2))
-
-        if cameraToggleSelf:
-            camValid, frame = vid.read()
-            if camValid:
-                imgBytes = imageEncode(frame, 70)
-                UDPclientWebcam.send(imgBytes)
-            else:
-                print("[CAM NOT VALID]")
-        if cameraToggleSelf and toggleLogic:
-            TCPclient.send(json.dumps(
-                {"request": "relay", "requestRelay": "cameraToggle", "target": callUsername, "bool": True}).encode())
-            toggleLogic = False
-            print("sending True")
-        if not cameraToggleSelf and not toggleLogic:
-            TCPclient.send(json.dumps(
-                {"request": "relay", "requestRelay": "cameraToggle", "target": callUsername, "bool": False}).encode())
-            print("sending False")
-            toggleLogic = True
+        try:
+            UDPclientMic.send(inputStream.read(chunks * 2))
+            # print("len: ",len(inputStream.read(chunks)))
+            # print("sent mic data!")
+            if cameraToggleSelf:
+                camValid, frame = vid.read()
+                if camValid:
+                    imgBytes = imageEncode(frame, 70)
+                    UDPclientCam.send(imgBytes)
+                else:
+                    print("[CAM NOT VALID]")
+            if cameraToggleSelf and toggleLogic:
+                TCPclient.send(json.dumps(
+                    {"request": "relay", "requestRelay": "cameraToggle", "target": callUsername, "bool": True}).encode())
+                toggleLogic = False
+                print("sending True")
+            if not cameraToggleSelf and not toggleLogic:
+                TCPclient.send(json.dumps(
+                    {"request": "relay", "requestRelay": "cameraToggle", "target": callUsername, "bool": False}).encode())
+                print("sending False")
+                toggleLogic = True
+        except:
+            pass
 
 
 # due to how pyqt5 works pythons garbage collector will automatically close windows that do not

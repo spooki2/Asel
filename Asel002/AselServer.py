@@ -18,7 +18,7 @@ with open('DataBase\\UserDataBase.txt') as DB:
 # regID is the ID of each users register line, it cannot be changed unlike names.
 # the function above makes regID the last line available
 ip = '0.0.0.0'
-port = 4002
+port = 4012
 
 while True:
     try:
@@ -191,21 +191,17 @@ def callThread(callerName, targetName):
         callerMicAddr = nameToMicAddr[callerName]
         targetMicAddr = nameToMicAddr[targetName]
 
-        # print(f"target: {callerMicAddr}")
-        # print(f"list: {addrToMicData}")
-        # print("daj: ",addrToMicData[callerMicAddr])
-        # print("")
         try:
             UDPserverMic.sendto(addrToMicData[callerMicAddr], targetMicAddr)
         except:
-            print('[addrToMicData Bad]: ',addrToMicData)
-            #traceback.print_exc()
+            print('[addrToMicData Bad]: ', addrToMicData)
+            # traceback.print_exc()
             pass
         try:
             UDPserverMic.sendto(addrToMicData[targetMicAddr], callerMicAddr)
         except:
-            #print('[addrToMicData Bad]')
-            #traceback.print_exc()
+            # print('[addrToMicData Bad]')
+            # traceback.print_exc()
             pass
         try:
             UDPserverWebcam.sendto(addrTocamData[callerCamAddr], targetCamAddr)
@@ -221,7 +217,7 @@ def callThread(callerName, targetName):
     print("[Call Ended]")
 
     addrTocamData = {}
-    addrToMicData = {}# empties all data upon hanging up
+    addrToMicData = {}  # empties all data upon hanging up
 
 
 addrTocamData = {}
@@ -336,10 +332,12 @@ def UDPcamThread():
         except:
             pass
 
+
 def UDPmicThread():
     while True:
         try:
-            micData, micAddr = UDPserverMic.recvfrom(90000)  # was 2048*2
+            micData, micAddr = UDPserverMic.recvfrom(90000)
+            print("micData recvd")
             addrToMicData[micAddr] = micData
         except:
             pass
