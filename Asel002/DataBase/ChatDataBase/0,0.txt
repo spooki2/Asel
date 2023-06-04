@@ -19,3 +19,7 @@
 {"sender": "0", "message": "hi"}
 {"sender": "0", "message": "hi"}
 {"sender": "0", "message": "hi"}
+{"sender": "0", "message": "blankMsg"}
+{"sender": "0", "message": "blankMsg"}
+{"sender": "0", "message": "blankMsg"}
+{"sender": "0", "message": "blankMsg"}

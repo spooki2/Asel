@@ -18,7 +18,7 @@ with open('DataBase\\UserDataBase.txt') as DB:
 # regID is the ID of each users register line, it cannot be changed unlike names.
 # the function above makes regID the last line available
 ip = '0.0.0.0'
-port = 4000
+port = 4002
 
 while True:
     try:
@@ -156,6 +156,7 @@ def callManager(callerName, targetName):  # this function manages calls between 
     global callChoiceEvent
     global killCallEvent
     callChoiceEvent = threading.Event()
+    callChoiceEvent = threading.Event()
     killCallEvent = threading.Event()
     callChoiceEvent.choice = False
     killCallEvent.choice = False
@@ -177,11 +178,14 @@ def callManager(callerName, targetName):  # this function manages calls between 
 
 
 def callThread(callerName, targetName):
+    global addrToMicData
+    global addrTocamData
     print(f"[Call Started Between <{callerName}> and <{targetName}>]")
     callAlive = True
     while callAlive:
         if killCallEvent.choice:
             callAlive = False
+
         callerCamAddr = nameToCamAddr[callerName]
         targetCamAddr = nameToCamAddr[targetName]
         callerMicAddr = nameToMicAddr[callerName]
@@ -194,19 +198,21 @@ def callThread(callerName, targetName):
         try:
             UDPserverMic.sendto(addrToMicData[callerMicAddr], targetMicAddr)
         except:
-            traceback.print_exc()
+            print('[addrToMicData Bad]: ',addrToMicData)
+            #traceback.print_exc()
             pass
         try:
             UDPserverMic.sendto(addrToMicData[targetMicAddr], callerMicAddr)
         except:
-            traceback.print_exc()
+            #print('[addrToMicData Bad]')
+            #traceback.print_exc()
             pass
         try:
-            UDPserverWebcam.sendto(addrToWebcamData[callerCamAddr], targetCamAddr)
+            UDPserverWebcam.sendto(addrTocamData[callerCamAddr], targetCamAddr)
         except:
             pass
         try:
-            UDPserverWebcam.sendto(addrToWebcamData[targetCamAddr], callerCamAddr)
+            UDPserverWebcam.sendto(addrTocamData[targetCamAddr], callerCamAddr)
         except:
             pass
     data = json.dumps({"request": "callEnded"})
@@ -214,8 +220,11 @@ def callThread(callerName, targetName):
     getSocketByName(targetName).send(data.encode())
     print("[Call Ended]")
 
+    addrTocamData = {}
+    addrToMicData = {}# empties all data upon hanging up
 
-addrToWebcamData = {}
+
+addrTocamData = {}
 addrToMicData = {}  # they both track data corelated with addresss
 
 nameToCamAddr = {}
@@ -321,18 +330,19 @@ def getSocketByName(name):
 
 def UDPcamThread():
     while True:
-        webcamData, webcamAddr = UDPserverWebcam.recvfrom(90000)
-        addrToWebcamData[webcamAddr] = webcamData
-
+        try:
+            webcamData, webcamAddr = UDPserverWebcam.recvfrom(90000)
+            addrTocamData[webcamAddr] = webcamData
+        except:
+            pass
 
 def UDPmicThread():
     while True:
         try:
-            micData, micAddr = UDPserverMic.recvfrom(2048*2)  # stuck on
+            micData, micAddr = UDPserverMic.recvfrom(90000)  # was 2048*2
             addrToMicData[micAddr] = micData
         except:
-            print("error in thread")
-            traceback.print_exc()
+            pass
 
 
 threading.Thread(target=UDPcamThread).start()

@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 import traceback
-
+import GUIcode
 import sounddevice as sd
 import cv2
 import pyaudio
@@ -28,6 +28,7 @@ chunks = 1024*2
 killCameraEvent = threading.Event()
 killCameraEvent.choice = False
 vid = None
+pyAudioIns = None
 inputStream = None
 outputStream = None
 threadCall = None
@@ -129,20 +130,17 @@ import wave
 
 
 def micListenThread():
-    filename = 'twoOfUs.wav'
-    wf = wave.open(filename, 'rb')
     # data = wf.readframes(chunks)
-    data, address = UDPclientMic.recvfrom(20000)
-    oldData = data
+    #silentData = wave.open(r"GUIcode/silentWav.wav", 'rb')
+    #data = silentData.readframes(chunks)
     while True:
-        data, address = UDPclientMic.recvfrom(chunks * 2)
-
-        if data == None:
-            print("NONe")
-            # Open the file
-        outputStream.write(data)
-        oldData = data
-
+        try:
+            data, address = UDPclientMic.recvfrom(90000)
+            while True:
+                data, address = UDPclientMic.recvfrom(90000)
+                outputStream.write(data)
+        except:
+            pass
 
 
 def camListenThread():
@@ -164,7 +162,6 @@ def camListenThread():
 
             pyqtPixmap = QPixmap.fromImage(pyqtImage)  # converts to pyqt5 image
         except:
-            print("[Bad Frame]")
             pass
 
 
@@ -208,7 +205,7 @@ def formatChatData(jsonStr):
 while True:
     try:
         ip = '10.0.0.23'
-        port = 4000
+        port = 4002
         TCPclient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         TCPclient.connect((ip, port))
         TCPclient.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
@@ -377,14 +374,15 @@ def checkIfCallEnded():
             # callEnded = False
             print("kill camera")
             vid.release()
-            # TODO ALL:
-            # inputStream.stop()
-            # inputStream.close()
-            # outputStream.stop()
-            # outputStream.close()
-            # pyAudioIns.terminate()
+            #
             runCallStartOnce = False
             runCallEndOnce = False
+            try:
+                inputStream.close()
+                outputStream.close()
+                pyAudioIns.terminate()
+            except:
+                pass
 
 
 runCallStartOnce = False
@@ -415,36 +413,39 @@ def imageDecode(bytesImage):  # Convert the base64 string back to an image
     return decoded_img
 
 
+
 def callThreadFunc():
-    # send microphone
-    # microphone sample rate
+    print("init")
+    global inputStream
+    global outputStream
+    global pyAudioIns
+    global vid
+    vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     pyAudioIns = pyaudio.PyAudio()
     channels = 1
     rate = 48000
     Format = pyaudio.paInt16
-
     default_device_index = pyAudioIns.get_default_input_device_info()["index"]
     deviceInfo = pyAudioIns.get_device_info_by_index(default_device_index)
     channels = deviceInfo["maxInputChannels"]
     rate = int(deviceInfo["defaultSampleRate"])
 
-    global inputStream
-    global outputStream
+
 
     inputStream = pyAudioIns.open(format=Format, channels=channels, rate=rate, input=True, frames_per_buffer=chunks)
     outputStream = pyAudioIns.open(format=Format, channels=channels, rate=rate, output=True, frames_per_buffer=chunks)
 
-    # Start video capture
-    global vid
 
-    vid = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+    #webcam
+
     camWorks = True
-
     toggleLogic = False
     while initCallGUI:
         # print("len: ",len(inputStream.read(chunks)))
-        UDPclientMic.send(inputStream.read(chunks))
         # print("sent mic data!")
+
+        UDPclientMic.send(inputStream.read(chunks*2))
 
         if cameraToggleSelf:
             camValid, frame = vid.read()
