@@ -318,9 +318,8 @@ def sendDM(message):
     TCPclient.send(json.dumps(data).encode())  # dict -> json[str]
 
 
-# todo:  sqllite, encyrpted "diffie hellman"
+# todo: encyrpted "diffie hellman"
 # todo strechlist:  block 2 many requests, check both sides for illegal characters
-# todo: remove useless ui buttons
 def userLookup(customInput=None):
     if not customInput:
         # userSearch = AselMainGUI.userLookupName
