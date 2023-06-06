@@ -6,6 +6,8 @@ import socket
 import sys
 import threading
 import time
+import traceback
+
 import cv2
 import numpy as np
 import pyaudio
@@ -72,8 +74,9 @@ def listenThreadTCP():
         except:
             try:
                 packet = json.loads(selfHellman.decrypt(rawPacket))
+
             except:
-                print(f"[BAD PACKET]: {TCPclient.recv(90000).decode()}")
+                print(f"[BAD PACKET]: {json.loads(TCPclient.recv(90000).decode())}")
         if packet['request'] == "exchangeKeys":
             selfHellman.setPeerPublic(packet['key'])
             selfHellman.generateSharedKey()
@@ -98,12 +101,12 @@ def listenThreadTCP():
                 recentChats.push(activeChatUser)
                 refreshChat()
         elif packet['request'] == "loadChat":
-            #packet = selfHellman.decrypt(packet)
 
             global activeChatData
 
             if activeChatUser == packet['from']:
                 activeChatData = formatChatData(json.dumps(packet))
+                # activeChatData = activeChatData.replace('[%S%]','"')
 
             else:
                 print("[NOTIFICATION]")
@@ -185,37 +188,28 @@ def callPopupChoice(Choice, popupObject):
 
 
 def formatChatData(jsonStr):
-    # Parse the outer JSON string
-    outer_json = json.loads(jsonStr)
-
-    # Check if outer_json has "request" and "data" keys
-    if "request" not in outer_json or "data" not in outer_json:
-        return "Invalid JSON string"
-
-    # Check if request is 'loadChat'
-    if outer_json["request"] != "loadChat":
-        return "Invalid request"
+    outerJson = json.loads(jsonStr)
 
     # Split the data string into separate lines
-    data_lines = outer_json["data"].split("\n")
+    dataLines = outerJson["data"].split("\n")
 
     # For each line, parse the JSON and format the output
-    formatted_data = []
-    for line in data_lines:
+    formattedData = []
+    for line in dataLines:
         if line:
-            # Parse the inner JSON string
             line = line.strip()
-            try:
-                inner_json = json.loads(line)
-            except:
-                print("problem line: ", line)
 
+            try:
+                innerJson = json.loads(line)
+            except:
+                pass
             # Format the output
-            formatted_line = f'{inner_json["sender"]}: {inner_json["message"]}'
-            formatted_data.append(formatted_line)
+
+            formattedLine = f'{innerJson["sender"]}: {innerJson["message"]}'
+            formattedData.append(formattedLine)
 
     # Join the formatted data lines into a single string with newlines
-    return "\n".join(formatted_data)
+    return "\n".join(formattedData)
 
 
 while True:
