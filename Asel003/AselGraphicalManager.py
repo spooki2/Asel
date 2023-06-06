@@ -6,7 +6,6 @@ import socket
 import sys
 import threading
 import time
-
 import cv2
 import numpy as np
 import pyaudio
@@ -14,7 +13,8 @@ from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QApplication
 
-from AselClass import lastTalkedStack
+from AselClass import lastTalkedStack, hellmanClass
+from AselClass import hellmanClass
 from GUIcode import AlertGUI
 from GUIcode import AselMainGUI
 from GUIcode import IntroGUI
@@ -54,6 +54,7 @@ registerValid = False
 loginValid = False
 runAselPath = False
 recentChats = lastTalkedStack(8)  # a custom class stack of all recent chats with the max value being set to 8
+selfHellman = hellmanClass(None)  # key will be updated in future
 
 
 def listenThreadTCP():
@@ -66,9 +67,16 @@ def listenThreadTCP():
         # print(f'[PACKET GOT]: {recv.decode()}')
         # packet =""
         try:
-            packet = json.loads(TCPclient.recv(90000).decode())
+            rawPacket = TCPclient.recv(90000).decode()
+            packet = json.loads(rawPacket)
         except:
-            print(f"[BAD PACKET]: {TCPclient.recv(90000).decode()}")
+            try:
+                packet = json.loads(selfHellman.decrypt(rawPacket))
+            except:
+                print(f"[BAD PACKET]: {TCPclient.recv(90000).decode()}")
+        if packet['request'] == "exchangeKeys":
+            selfHellman.setPeerPublic(packet['key'])
+            selfHellman.generateSharedKey()
 
         if packet['request'] == "registerStatus":
             global registerValid
@@ -90,6 +98,8 @@ def listenThreadTCP():
                 recentChats.push(activeChatUser)
                 refreshChat()
         elif packet['request'] == "loadChat":
+            #packet = selfHellman.decrypt(packet)
+
             global activeChatData
 
             if activeChatUser == packet['from']:
@@ -128,7 +138,6 @@ def micListenThread():
     # silentData = wave.open(r"GUIcode/silentWav.wav", 'rb')
     # data = silentData.readframes(chunks)
     global dataMic
-    clearCache = False
     while True:
         try:
             data, serverMicAddr = UDPclientMic.recvfrom(90000)
@@ -213,11 +222,11 @@ while True:
     try:
         ip = '10.0.0.23'
         port = 4012
+
         TCPclient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         TCPclient.connect((ip, port))
         TCPclient.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # makes port available after closing
         print(f"TCP connected on port {port}")
-
         # UDP client socket
         UDPclientCam = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         UDPclientCam.connect((ip, (port + 1)))
@@ -237,6 +246,8 @@ threading.Thread(target=listenThreadTCP).start()
 threading.Thread(target=camListenThread).start()
 threading.Thread(target=micListenThread).start()
 myUsername = "blank"
+hellmanData = json.dumps({"request": "exchangeKeys", "key": selfHellman.getMyPublic()})
+TCPclient.send(hellmanData.encode())
 
 
 def regSubmit():
@@ -246,15 +257,17 @@ def regSubmit():
     username = RegisterGUI.username
     myUsername = username
     passwordHash = hashlib.sha256(RegisterGUI.password.encode()).hexdigest()
-    data = {"request": "register", "username": username, "password": passwordHash}
-    TCPclient.send((json.dumps(data)).encode())  # dict -> json[str]
+    data = {"request": "register", "username": selfHellman.encrypt(username),
+            "password": selfHellman.encrypt(passwordHash)}
+    TCPclient.send(json.dumps(data).encode())  # dict -> json[str]
     RegisterGUI.registerGlobal.close()
 
 
 def logSubmit():
     username = LoginGUI.username
     passwordHash = hashlib.sha256(LoginGUI.password.encode()).hexdigest()
-    data = {"request": "login", "username": username, "password": passwordHash}
+    data = {"request": "login", "username": selfHellman.encrypt(username),
+            "password": selfHellman.encrypt(passwordHash)}
     TCPclient.send(json.dumps(data).encode())  # dict -> json[str]
     LoginGUI.loginGlobal.close()
 
@@ -318,8 +331,6 @@ def sendDM(message):
     TCPclient.send(json.dumps(data).encode())  # dict -> json[str]
 
 
-# todo: encyrpted "diffie hellman"
-# todo strechlist:  block 2 many requests, check both sides for illegal characters
 def userLookup(customInput=None):
     if not customInput:
         # userSearch = AselMainGUI.userLookupName

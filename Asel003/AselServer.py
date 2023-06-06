@@ -6,6 +6,7 @@ import time
 import traceback
 import sqlite3
 import hashlib
+from AselClass import hellmanClass
 
 # setup variables
 
@@ -147,17 +148,20 @@ def dmServerManager(senderName, targetName, message, onlyLoad=False):
         rowSplit = '{' + f'"sender":"{row[0]}","message":"{row[1]}"' + '}'
 
         appendData += rowSplit + "\n"
+
     S_dataChatDB = {"request": "loadChat", "from": targetName, "data": appendData}
     T_dataChatDB = {"request": "loadChat", "from": senderName, "data": appendData}
 
     try:
-        getSocketByName(senderName).send(json.dumps(S_dataChatDB).encode())
+        S_dataChatDB = addrToHellman[nameToTCPaddr[senderName]].encrypt(json.dumps(S_dataChatDB))
+        getSocketByName(senderName).send(S_dataChatDB.encode())
     except:
-        traceback.print_exc()
+        #traceback.print_exc()
         pass
     try:
         getSocketByName(targetName).send(json.dumps(T_dataChatDB).encode())
     except:
+        #traceback.print_exc()
         pass
 
 
@@ -242,8 +246,15 @@ addrToMicData = {}  # they both track data corelated with addresss
 nameToCamAddr = {}
 nameToMicAddr = {}  # they both track the ip and the udp port of each name
 
-socketNames = {}  # declartion, dict maps usernames to sockets {username:socket}
-addressNames = {}
+nameToTCPaddr = {}
+
+addrToHellman = {}  # maps class to addrs
+addrToPrivateKey = {}
+socketNames = {}
+
+# generates a temporary private key [WITHOUT SHARING] per each session and correlates it to the address-
+# of a connected client.
+# this might be a security vulneravity, idk tho :3
 
 
 def TCPhandleClient(clientSocket, clientAddress):
@@ -253,7 +264,8 @@ def TCPhandleClient(clientSocket, clientAddress):
     global nameToCamAddr
     global nameToMicAddr
     global noUsersConnected
-    global addressNames
+    global nameToTCPaddr
+    global addrToHellman
     activeConnections += 1
     print(f"[TCP CONNECTION STARTED {clientAddress}] [{activeConnections} Total]")
     while not ConnectionDead:  # runs as long as user connected
@@ -262,12 +274,19 @@ def TCPhandleClient(clientSocket, clientAddress):
                 print("[Opening Databases..]")
                 openSQLall()
                 noUsersConnected = False
-            recv = clientSocket.recv(1024)
-            packet = recv.decode()
+            packetRaw = clientSocket.recv(1024)
+            packet = packetRaw.decode()
             if isValidJson(packet):  # json format validation
                 userInfo = json.loads(packet)
                 # userInfo is DICT
-                if userInfo['request'] == "register":
+                if userInfo['request'] == "exchangeKeys":
+                    addrToHellman[clientAddress] = hellmanClass(userInfo['key'])
+                    clientSocket.send(json.dumps(
+                        {"request": "exchangeKeys", "key": addrToHellman[clientAddress].getMyPublic()}).encode())
+                    addrToHellman[clientAddress].generateSharedKey()
+                elif userInfo['request'] == "register":
+                    userInfo['username'] = addrToHellman[clientAddress].decrypt(userInfo['username'])
+                    userInfo['password'] = addrToHellman[clientAddress].decrypt(userInfo['password'])
                     frmtUserInfo = formatUserInfo(userInfo)
                     if frmtUserInfo['username'] == "" or frmtUserInfo['password'] == hashlib.sha256(
                             "".encode()).hexdigest():
@@ -283,10 +302,13 @@ def TCPhandleClient(clientSocket, clientAddress):
                         print("[REGISTER]: invalid")
 
                 elif userInfo['request'] == "login":
+                    userInfo['username'] = addrToHellman[clientAddress].decrypt(userInfo['username'])
+                    userInfo['password'] = addrToHellman[clientAddress].decrypt(userInfo['password'])
+
                     if databaseCheck(userInfo):
                         clientSocket.send(json.dumps({"request": "loginStatus", "loginValid": True}).encode())
                         socketNames[userInfo['username']] = clientSocket
-                        addressNames[userInfo['username']] = clientAddress
+                        nameToTCPaddr[userInfo['username']] = clientAddress
                         clientName = userInfo['username']
                     else:
                         clientSocket.send(json.dumps({"request": "loginStatus", "loginValid": False}).encode())
@@ -329,7 +351,7 @@ def TCPhandleClient(clientSocket, clientAddress):
                 raise Exception("[JSON RECEIVED IS NOT VALID]")
 
         except:
-            traceback.print_exc()
+            #traceback.print_exc()
             ConnectionDead = True
             activeConnections -= 1
             print("")
@@ -360,7 +382,6 @@ def UDPmicThread():
         try:
             micData, micAddr = UDPserverMic.recvfrom(50000)
             addrToMicData[micAddr] = micData
-            print("got new data!")
         except:
             pass
 
