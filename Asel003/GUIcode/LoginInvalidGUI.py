@@ -1,6 +1,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from GUIcode import CSSdata
 
+
 class LoginInvalidGUI(object):
     def setupUi(self, loginInvalid, tryAgain):
         loginInvalid.setObjectName("loginInvalid")
@@ -38,7 +39,9 @@ class LoginInvalidGUI(object):
         QtCore.QMetaObject.connectSlotsByName(loginInvalid)
 
         loginInvalid.setWindowTitle("loginInvalid")
-        self.label.setText("<html><head/><body><p align=\"center\"><span style=\" font-size:16pt;\">Login Invalid</span></p></body></html>")
-        self.label_2.setText("<html><head/><body><p align=\"center\"><span style=\" font-size:8pt;\">name/password were incorrect</span></p></body></html>")
+        self.label.setText(
+            "<html><head/><body><p align=\"center\"><span style=\" font-size:16pt;\">Login Invalid</span></p></body></html>")
+        self.label_2.setText(
+            "<html><head/><body><p align=\"center\"><span style=\" font-size:8pt;\">name/password were incorrect</span></p></body></html>")
         self.pushButton.setText("try again")
         self.pushButton_2.clicked.connect(tryAgain)

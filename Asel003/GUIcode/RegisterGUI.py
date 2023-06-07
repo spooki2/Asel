@@ -3,7 +3,7 @@ from GUIcode import CSSdata
 
 
 class RegisterGUI():
-    def setupUi(self, register,registerSubmit):
+    def setupUi(self, register, registerSubmit):
         register.setObjectName("register")
         register.resize(240, 120)
         register.setMouseTracking(False)
@@ -43,19 +43,20 @@ class RegisterGUI():
         QtCore.QMetaObject.connectSlotsByName(register)
 
         register.setWindowTitle("Asel")
-        self.label.setText("<html><head/><body><p align=\"right\"><span style=\" font-size:12pt; color:#ffffff;\">Username:</span></p></body></html>")
-        self.label_2.setText("<html><head/><body><p align=\"right\"><span style=\" font-size:12pt; color:#ffffff;\">Password:</span></p></body></html>")
+        #chatgpt html
+        self.label.setText(
+            "<html><head/><body><p align=\"right\"><span style=\" font-size:12pt; color:#ffffff;\">Username:</span></p></body></html>")
+        self.label_2.setText(
+            "<html><head/><body><p align=\"right\"><span style=\" font-size:12pt; color:#ffffff;\">Password:</span></p></body></html>")
         self.pushButton_2.setText("Register")
+
         def infoStorage():
             global username
             global password
             username = self.lineEdit.text()
             password = self.lineEdit_2.text()
             registerSubmit()
-            
-        self.pushButton_2.clicked.connect(infoStorage) #sets name and pass and then callback button press
+
+        self.pushButton_2.clicked.connect(infoStorage)  # sets name and pass and then callback button press
         global registerGlobal
-        registerGlobal = register #object in global form
-
-
-
+        registerGlobal = register  # object in global form

@@ -6,7 +6,6 @@ import socket
 import sys
 import threading
 import time
-import traceback
 
 import cv2
 import numpy as np
@@ -15,8 +14,8 @@ from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QApplication
 
-from AselClass import lastTalkedStack, hellmanClass
 from AselClass import hellmanClass
+from AselClass import lastTalkedStack
 from GUIcode import AlertGUI
 from GUIcode import AselMainGUI
 from GUIcode import IntroGUI
@@ -55,6 +54,7 @@ registerSubmitPath = False
 registerValid = False
 loginValid = False
 runAselPath = False
+aselAppInstance = None
 recentChats = lastTalkedStack(8)  # a custom class stack of all recent chats with the max value being set to 8
 selfHellman = hellmanClass(None)  # key will be updated in future
 
@@ -66,8 +66,6 @@ def listenThreadTCP():
         global callUsername
         global activeChatUser
         global initCallGUI
-        # print(f'[PACKET GOT]: {recv.decode()}')
-        # packet =""
         try:
             rawPacket = TCPclient.recv(90000).decode()
             packet = json.loads(rawPacket)
@@ -106,7 +104,6 @@ def listenThreadTCP():
 
             if activeChatUser == packet['from']:
                 activeChatData = formatChatData(json.dumps(packet))
-                # activeChatData = activeChatData.replace('[%S%]','"')
 
             else:
                 print("[NOTIFICATION]")
@@ -314,15 +311,21 @@ def execGUI(objectGUI, *callbacks):  # function that procedurally runs a GUI mod
     app = QApplication(sys.argv)
     Asel = objectGUI.QtWidgets.QMainWindow()
     classGUI().setupUi(Asel, *callbacks)
+    if objectGUI == AselMainGUI:
+        global aselAppInstance
+        aselAppInstance = app
+        aselAppInstance.aboutToQuit.connect(aboutToClose)
     Asel.show()
     app.exec_()
+
 
 
 def sendDM(message):
     data = {"request": "dm", "target": activeChatUser, "message": message}
     if message == "" or message is None:
-        data = {"request": "dm", "target": activeChatUser, "message": "blankMsg"}  # * testing
-    TCPclient.send(json.dumps(data).encode())  # dict -> json[str]
+        pass
+    else:
+        TCPclient.send(json.dumps(data).encode())  # dict -> json[str]
 
 
 def userLookup(customInput=None):
@@ -477,6 +480,12 @@ def callMicThread():
             pass
 
 
+def aboutToClose():
+    print("[Shutting down...]")
+    os.system('kill %d' % os.getpid())
+
+
+
 def callCamThread():
     global vid
     toggleLogic = False
@@ -558,7 +567,7 @@ def pathController():
         if loginValid:
             execGUI(AlertGUI, okLogin, "login Successful", "", "Open Asel")
             execGUI(AselMainGUI, userLookup, sendDM, refreshLite, sendCallRequest, checkIfCalled, callUsername,
-                    initCallFunc, updateCamFeed, killCall, checkIfCallEnded, checkIfMuted)
+                    initCallFunc, updateCamFeed, killCall, checkIfCallEnded, checkIfMuted, aboutToClose)
         else:
             execGUI(AlertGUI, tryAgainLogin, "Login Invalid", "please check your credentials", "Try Again")
             if skipToLogin:

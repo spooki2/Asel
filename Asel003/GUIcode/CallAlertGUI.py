@@ -22,7 +22,6 @@ class classCallAlertGUI(object):
         self.callerName.setObjectName("callerName")
         self.acceptCallButton = QtWidgets.QPushButton(callAlert)
         self.acceptCallButton.setGeometry(QtCore.QRect(90, 90, 41, 41))
-        self.acceptCallButton.setToolTip("")
         self.acceptCallButton.setStyleSheet("QPushButton{\n"
 "    background-color: rgb(48, 214, 76);\n"
 "    border: 1px rgb(60,60,60);\n"
@@ -37,14 +36,12 @@ class classCallAlertGUI(object):
 "QPushButton:pressed {\n"
 "    background-color: rgb(40,40,40);\n"
 "}")
-        self.acceptCallButton.setText("")
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap("GUIcode/icons/phone.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.acceptCallButton.setIcon(icon)
         self.acceptCallButton.setObjectName("acceptCallButton")
         self.declineCallButton = QtWidgets.QPushButton(callAlert)
         self.declineCallButton.setGeometry(QtCore.QRect(20, 90, 41, 41))
-        self.declineCallButton.setToolTip("")
         self.declineCallButton.setStyleSheet("QPushButton{\n"
 "    background-color: rgb(214, 47, 47);\n"
 "    border: 1px rgb(60,60,60);\n"
@@ -59,7 +56,6 @@ class classCallAlertGUI(object):
 "QPushButton:pressed {\n"
 "    background-color: rgb(40,40,40);\n"
 "}")
-        self.declineCallButton.setText("")
         icon1 = QtGui.QIcon()
         icon1.addPixmap(QtGui.QPixmap("GUIcode/icons/hangup.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.declineCallButton.setIcon(icon1)

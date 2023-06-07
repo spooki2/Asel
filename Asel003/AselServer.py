@@ -1,9 +1,6 @@
 import json
-import os
 import socket
 import threading
-import time
-import traceback
 import sqlite3
 import hashlib
 from AselClass import hellmanClass
@@ -156,12 +153,10 @@ def dmServerManager(senderName, targetName, message, onlyLoad=False):
         S_dataChatDB = addrToHellman[nameToTCPaddr[senderName]].encrypt(json.dumps(S_dataChatDB))
         getSocketByName(senderName).send(S_dataChatDB.encode())
     except:
-        #traceback.print_exc()
         pass
     try:
         getSocketByName(targetName).send(json.dumps(T_dataChatDB).encode())
     except:
-        #traceback.print_exc()
         pass
 
 
@@ -251,11 +246,8 @@ nameToTCPaddr = {}
 addrToHellman = {}  # maps class to addrs
 addrToPrivateKey = {}
 socketNames = {}
-
 # generates a temporary private key [WITHOUT SHARING] per each session and correlates it to the address-
 # of a connected client.
-# this might be a security vulneravity, idk tho :3
-
 
 def TCPhandleClient(clientSocket, clientAddress):
     ConnectionDead = False
@@ -351,7 +343,6 @@ def TCPhandleClient(clientSocket, clientAddress):
                 raise Exception("[JSON RECEIVED IS NOT VALID]")
 
         except:
-            #traceback.print_exc()
             ConnectionDead = True
             activeConnections -= 1
             print("")

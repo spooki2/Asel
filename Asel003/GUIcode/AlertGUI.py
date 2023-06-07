@@ -1,8 +1,9 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from GUIcode import CSSdata
 
+
 class AlertGUI():
-    def setupUi(self,alert,okButton,bigLabel,smallLabel,buttonText):
+    def setupUi(self, alert, okButton, bigLabel, smallLabel, buttonText):
         alert.setObjectName("Asel")
         alert.resize(200, 120)
         alert.setStyleSheet("background-color: rgb(51,51,51);")
@@ -36,12 +37,13 @@ class AlertGUI():
         self.pushButton.setObjectName("pushButton")
         alert.setCentralWidget(self.centralwidget)
 
-        
         QtCore.QMetaObject.connectSlotsByName(alert)
         alert.setWindowTitle("Asel")
-        self.label.setText(f"<html><head/><body><p align=\"center\"><span style=\" font-size:16pt;\">{bigLabel}</span></p></body></html>")
-        self.label_2.setText(f"<html><head/><body><p align=\"center\"><span style=\" font-size:8pt;\">{smallLabel}</span></p></body></html>")
+        self.label.setText(
+            f"<html><head/><body><p align=\"center\"><span style=\" font-size:16pt;\">{bigLabel}</span></p></body></html>")
+        self.label_2.setText(
+            f"<html><head/><body><p align=\"center\"><span style=\" font-size:8pt;\">{smallLabel}</span></p></body></html>")
         self.pushButton.setText(buttonText)
         self.pushButton.clicked.connect(okButton)
         global alertGlobal
-        alertGlobal = alert #object in global form
+        alertGlobal = alert  # object in global form

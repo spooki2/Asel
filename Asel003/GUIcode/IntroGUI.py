@@ -3,7 +3,7 @@ from GUIcode import CSSdata
 
 
 class IntroGUI:
-    def setupUi(self,intro,regChoice,logChoice):
+    def setupUi(self, intro, regChoice, logChoice):
         intro.setObjectName("intro")
         intro.resize(190, 130)
         intro.setStyleSheet("background-color: rgb(51,51,51);")
@@ -31,12 +31,13 @@ class IntroGUI:
         intro.setCentralWidget(self.centralwidget)
 
         QtCore.QMetaObject.connectSlotsByName(intro)
-        intro.setWindowTitle( "Asel")
+        intro.setWindowTitle("Asel")
         self.pushButton.setText("Register")
         self.pushButton_2.setText("Login")
-        self.label.setText("<html><head/><body><p align=\"center\"><span style=\" font-size:16pt;\">Welcome To Asel!</span></p></body></html>")
-        #self.pushButton.clicked.connect(regChoice)
+        self.label.setText(
+            "<html><head/><body><p align=\"center\"><span style=\" font-size:16pt;\">Welcome To Asel!</span></p></body></html>")
+        # self.pushButton.clicked.connect(regChoice)
         self.pushButton.clicked.connect(regChoice)
-        self.pushButton_2.clicked.connect(logChoice) #callback functions to which button was clicked
+        self.pushButton_2.clicked.connect(logChoice)  # callback functions to which button was clicked
         global introGlobal
         introGlobal = intro

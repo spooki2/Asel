@@ -18,7 +18,7 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.window.show()
 
     def setupUi(self, Asel, userLookup, sendMessage, refreshLite, callRequest, checkIfCalled, callerName, initCallFunc,
-                updateCamFeed, killCall, checkIfCallEnded, checkIfMuted):
+                updateCamFeed, killCall, checkIfCallEnded, checkIfMuted, aboutToClose):
         global loadedText
         loadedText = None
         global camToggle
@@ -33,7 +33,6 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.centralwidget.setObjectName("centralwidget")
         self.stackedWidget = QtWidgets.QStackedWidget(self.centralwidget)
         self.stackedWidget.setGeometry(QtCore.QRect(0, 0, 561, 440))
-        self.stackedWidget.setStyleSheet("")
         self.stackedWidget.setObjectName("stackedWidget")
 
         self.chatFrame = QtWidgets.QWidget()
@@ -50,7 +49,6 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.msgLine = QtWidgets.QLineEdit(self.chatFrame)
         self.msgLine.setGeometry(QtCore.QRect(210, 390, 271, 41))
         self.msgLine.setStyleSheet(CSSdata.lineEditCSS)
-        self.msgLine.setText("")
         self.msgLine.setObjectName("msgLine")
         self.textBox = QtWidgets.QTextEdit(self.chatFrame)
         self.textBox.setGeometry(QtCore.QRect(210, 10, 341, 371))
@@ -97,13 +95,10 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.userLine = QtWidgets.QLineEdit(self.chatFrame)
         self.userLine.setGeometry(QtCore.QRect(10, 10, 191, 31))
         self.userLine.setStyleSheet(CSSdata.lineEditCSS)
-        self.userLine.setText("")
         self.userLine.setObjectName("userLine")
         self.callButton = QtWidgets.QPushButton(self.chatFrame)
         self.callButton.setGeometry(QtCore.QRect(520, 20, 21, 21))
-        self.callButton.setToolTip("")
         self.callButton.setStyleSheet(CSSdata.callButtonCSS)
-        self.callButton.setText("")
         icon = QtGui.QIcon.fromTheme("call")
         self.callButton.setIcon(icon)
         self.callButton.setObjectName("callButton")
@@ -118,32 +113,25 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         self.camFrame.setObjectName("camFrame")
         self.webCam = QtWidgets.QLabel(self.camFrame)
         self.webCam.setGeometry(QtCore.QRect(100, 10, 341, 341))
-        self.webCam.setText("")
         self.webCam.setPixmap(QtGui.QPixmap("GUIcode/icons/cameraOff.png"))
         self.webCam.setObjectName("Webcam")
         self.hangUpCallButton = QtWidgets.QPushButton(self.vcPage)
         self.hangUpCallButton.setGeometry(QtCore.QRect(450, 380, 101, 51))
-        self.hangUpCallButton.setToolTip("")
         self.hangUpCallButton.setStyleSheet(CSSdata.hangUpCallCSS)
-        self.hangUpCallButton.setText("")
         icon1 = QtGui.QIcon()
         icon1.addPixmap(QtGui.QPixmap("GUIcode/icons/hangup.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.hangUpCallButton.setIcon(icon1)
         self.hangUpCallButton.setObjectName("hangUpCallButton")
         self.muteButton = QtWidgets.QPushButton(self.vcPage)
         self.muteButton.setGeometry(QtCore.QRect(330, 380, 51, 51))
-        self.muteButton.setToolTip("")
         self.muteButton.setStyleSheet(CSSdata.utilityButtonCSS)
-        self.muteButton.setText("")
         icon2 = QtGui.QIcon()
         icon2.addPixmap(QtGui.QPixmap("GUIcode/icons/mic.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.muteButton.setIcon(icon2)
         self.muteButton.setObjectName("muteButton")
         self.cameraButton = QtWidgets.QPushButton(self.vcPage)
         self.cameraButton.setGeometry(QtCore.QRect(390, 380, 51, 51))
-        self.cameraButton.setToolTip("")
         self.cameraButton.setStyleSheet(CSSdata.utilityButtonCSS)
-        self.cameraButton.setText("")
         icon3 = QtGui.QIcon()
         icon3.addPixmap(QtGui.QPixmap("GUIcode/icons/camera.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.cameraButton.setIcon(icon3)
@@ -182,6 +170,7 @@ class AselMainGUIclass(QtWidgets.QMainWindow):
         def userLookupCall(str):
             userLookup(str)
 
+        #self.aboutToQuit.connect(aboutToClose)
         self.friendBox1.clicked.connect(lambda: userLookupCall(self.friendBox1.text()))
         self.friendBox2.clicked.connect(lambda: userLookupCall(self.friendBox2.text()))
         self.friendBox3.clicked.connect(lambda: userLookupCall(self.friendBox3.text()))

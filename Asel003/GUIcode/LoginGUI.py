@@ -1,8 +1,9 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from GUIcode import CSSdata
 
+
 class LoginGUI():
-    def setupUi(self, login,loginSubmit):
+    def setupUi(self, login, loginSubmit):
         login.setObjectName("login")
         login.resize(240, 120)
         login.setMouseTracking(False)
@@ -42,10 +43,11 @@ class LoginGUI():
         QtCore.QMetaObject.connectSlotsByName(login)
 
         login.setWindowTitle("Asel")
-        self.label.setText("<html><head/><body><p align=\"right\"><span style=\" font-size:12pt; color:#ffffff;\">Username:</span></p></body></html>")
-        self.label_2.setText("<html><head/><body><p align=\"right\"><span style=\" font-size:12pt; color:#ffffff;\">Password:</span></p></body></html>")
+        self.label.setText(
+            "<html><head/><body><p align=\"right\"><span style=\" font-size:12pt; color:#ffffff;\">Username:</span></p></body></html>")
+        self.label_2.setText(
+            "<html><head/><body><p align=\"right\"><span style=\" font-size:12pt; color:#ffffff;\">Password:</span></p></body></html>")
         self.pushButton_2.setText("Login")
-
 
         def infoStorage():
             global username
@@ -53,8 +55,7 @@ class LoginGUI():
             username = self.lineEdit.text()
             password = self.lineEdit_2.text()
             loginSubmit()
-            
-        self.pushButton_2.clicked.connect(infoStorage) #sets name and pass and then callback button press
-        global loginGlobal
-        loginGlobal = login #object in global form
 
+        self.pushButton_2.clicked.connect(infoStorage)  # sets name and pass and then callback button press
+        global loginGlobal
+        loginGlobal = login  # object in global form
