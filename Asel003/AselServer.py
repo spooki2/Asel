@@ -155,7 +155,8 @@ def dmServerManager(senderName, targetName, message, onlyLoad=False):
     except:
         pass
     try:
-        getSocketByName(targetName).send(json.dumps(T_dataChatDB).encode())
+        T_dataChatDB = addrToHellman[nameToTCPaddr[targetName]].encrypt(json.dumps(T_dataChatDB))
+        getSocketByName(targetName).send(T_dataChatDB.encode())
     except:
         pass
 
